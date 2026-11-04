@@ -72,11 +72,19 @@ describe("validateInput: options", () => {
     expect(errorFrom("cafés", options).code).toBe("INVALID_OPTIONS");
   });
 
+  it.each(["openai", "anthropic", "google", "xai", "deepseek"])("accepts the %s provider", (provider) => {
+    expect(validateInput("cafés", { provider, apiKey: "key-123" }).options.provider).toBe(provider);
+  });
+
   it("rejects an unknown provider and lists the supported ones", () => {
     const error = errorFrom("cafés", { ...validOptions, provider: "mistral" });
     expect(error.code).toBe("UNSUPPORTED_PROVIDER");
     expect(error.message).toContain('"mistral"');
-    expect(error.message).toContain('"openai"');
+    expect(error.message).toContain('"openai", "anthropic", "google", "xai", "deepseek"');
+  });
+
+  it("is case-sensitive about provider names", () => {
+    expect(errorFrom("cafés", { ...validOptions, provider: "OpenAI" }).code).toBe("UNSUPPORTED_PROVIDER");
   });
 
   it("rejects a missing provider", () => {
@@ -122,6 +130,7 @@ describe("validateInput: security", () => {
 
   it("truncates long values shown in error messages", () => {
     const error = errorFrom("cafés", { ...validOptions, provider: "x".repeat(200) });
-    expect(error.message.length).toBeLessThan(150);
+    expect(error.message).toContain(`"${"x".repeat(30)}…"`);
+    expect(error.message).not.toContain("x".repeat(31));
   });
 });

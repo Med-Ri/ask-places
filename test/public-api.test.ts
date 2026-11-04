@@ -11,7 +11,7 @@ describe("public API", () => {
     ]);
   });
 
-  it("starts with OpenAI as the only provider", () => {
-    expect(askplaces.SUPPORTED_PROVIDERS).toEqual(["openai"]);
+  it("supports the five most popular LLM providers", () => {
+    expect(askplaces.SUPPORTED_PROVIDERS).toEqual(["openai", "anthropic", "google", "xai", "deepseek"]);
   });
 });

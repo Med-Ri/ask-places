@@ -1,5 +1,8 @@
-/** LLM providers askplaces can talk to. More will be added (anthropic, google...). */
-export const SUPPORTED_PROVIDERS = ["openai"] as const;
+/**
+ * LLM providers askplaces can talk to:
+ * OpenAI (GPT), Anthropic (Claude), Google (Gemini), xAI (Grok), DeepSeek.
+ */
+export const SUPPORTED_PROVIDERS = ["openai", "anthropic", "google", "xai", "deepseek"] as const;
 
 export type Provider = (typeof SUPPORTED_PROVIDERS)[number];
 
