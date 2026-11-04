@@ -15,7 +15,7 @@ const places = await askPlaces("cafés near Lac 2, Tunis", {
 ```
 
 - Backend only (Node.js 22+): your LLM key must never be shipped to a browser or mobile app.
-- Only your LLM API key is required. Place data comes from OpenStreetMap.
+- Only your LLM API key is required. Place data comes from [Overture Maps](https://overturemaps.org).
 
 ## Development
 
