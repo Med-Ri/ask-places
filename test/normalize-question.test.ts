@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeQuestion } from "../src/index.js";
+import { normalizeQuestion } from "../src/normalize-question.js";
 
 describe("normalizeQuestion", () => {
   it("trims spaces at both ends", () => {
