@@ -31,7 +31,8 @@
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "try:search": "tsx scripts/try-search.ts"
   },
   "keywords": [
     "places",
@@ -45,7 +46,11 @@
   "devDependencies": {
     "@types/node": "^24.19.2",
     "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "^2.0.0-r.1"
   }
 }
