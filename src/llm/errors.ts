@@ -82,9 +82,10 @@ export function usageErrorFromLlm(error: unknown, provider: string): AskPlacesUs
   }
 
   if (isUnknownModelError(error)) {
+    const hint = shortProviderHint(inner);
     return new AskPlacesUsageError(
       "INVALID_OPTIONS",
-      `askplaces: the model for "${provider}" was not found or is no longer available. Pass a valid options.model, or omit it to use the default.`,
+      `askplaces: the model for "${provider}" was not found or is no longer available${hint ? ` (${hint})` : ""}. Pass a valid options.model, or omit it to use the default.`,
     );
   }
 
@@ -96,4 +97,15 @@ export function usageErrorFromLlm(error: unknown, provider: string): AskPlacesUs
   }
 
   return null;
+}
+
+/** One short, key-free clause from the provider message for clearer usage errors. */
+function shortProviderHint(error: unknown): string | null {
+  if (!APICallError.isInstance(error)) return null;
+  const raw = error.message.replace(/\s+/g, " ").trim();
+  if (raw === "") return null;
+  const cut = raw.length > 120 ? `${raw.slice(0, 117)}…` : raw;
+  // Never echo anything that looks like a secret.
+  if (/gsk_|sk-|api[_-]?key|bearer\s+\S+/i.test(cut)) return null;
+  return cut;
 }

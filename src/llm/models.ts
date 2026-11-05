@@ -17,8 +17,12 @@ export const DEFAULT_MODELS = {
   google: "gemini-3.8-flash",
   xai: "grok-4.20-non-reasoning",
   deepseek: "deepseek-flash",
-  /** Groq (console.groq.com) — not the same as xAI Grok. Keys start with gsk_. */
-  groq: "llama-3.3-70b-versatile",
+  /**
+   * Groq (console.groq.com) — not the same as xAI Grok. Keys start with gsk_.
+   * llama-3.1-8b-instant / llama-3.3-70b-versatile were shut down for free/developer
+   * tiers on 2026-08-16; openai/gpt-oss-20b is Groq's recommended replacement.
+   */
+  groq: "openai/gpt-oss-20b",
 } as const satisfies Record<Provider, string>;
 
 /** Builds a Vercel AI SDK model from the developer's provider + API key (+ optional model id). */

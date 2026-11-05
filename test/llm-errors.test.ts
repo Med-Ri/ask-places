@@ -89,7 +89,7 @@ describe("usageErrorFromLlm", () => {
     expect(error?.message).toContain('"google"');
   });
 
-  it("maps a retired Google model 404 to INVALID_OPTIONS", () => {
+  it("maps a retired Google model 404 to INVALID_OPTIONS and keeps a short provider hint", () => {
     const gone = apiError(
       404,
       "This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.8-flash",
@@ -97,7 +97,8 @@ describe("usageErrorFromLlm", () => {
     expect(isUnknownModelError(gone)).toBe(true);
     const error = usageErrorFromLlm(gone, "google");
     expect(error?.code).toBe("INVALID_OPTIONS");
-    expect(error?.message).toContain("no longer available");
+    expect(error?.message).toContain("gemini-2.5-flash");
+    expect(error?.message).toContain("gemini-3.8-flash");
   });
 
   it("maps AbortSignal TimeoutError to PROVIDER_TIMEOUT", () => {
