@@ -1,8 +1,10 @@
 /**
- * Common Overture Places category ids, used only as guidance for the LLM.
+ * Common Overture Places category ids, used as guidance for the LLM.
  * Broad ids (e.g. "food_and_drink") match whole branches of the taxonomy hierarchy.
+ * The model may also use other valid Overture ids when none of these fit.
  */
 export const COMMON_CATEGORIES = [
+  // Food & drink
   "food_and_drink",
   "restaurant",
   "cafe",
@@ -11,6 +13,7 @@ export const COMMON_CATEGORIES = [
   "bakery",
   "bar",
   "pub",
+  "nightclub",
   "fast_food_restaurant",
   "pizza_restaurant",
   "burger_restaurant",
@@ -22,31 +25,41 @@ export const COMMON_CATEGORIES = [
   "japanese_restaurant",
   "indian_restaurant",
   "french_restaurant",
+  // Stay
   "hotel",
   "hostel",
   "bed_and_breakfast",
+  // Health
   "pharmacy",
   "hospital",
   "clinic",
+  "medical_center",
   "dental_clinic",
   "doctors_office",
   "veterinary_service",
+  // Money
   "financial_service",
   "bank_or_credit_union",
   "bank",
   "atm",
+  // Shopping / stores
+  "shopping",
+  "department_store",
+  "shopping_center",
   "supermarket",
   "grocery_store",
   "convenience_store",
-  "shopping",
   "clothing_store",
   "electronics_store",
   "furniture_store",
   "bookstore",
+  "market",
+  // Beauty / sport
   "gym",
   "spa",
   "beauty_salon",
   "hair_salon",
+  // Education / culture
   "school",
   "university",
   "library",
@@ -55,19 +68,27 @@ export const COMMON_CATEGORIES = [
   "cinema",
   "theater",
   "nightlife",
+  // Transport
   "gas_station",
   "parking",
   "public_transport",
   "train_station",
   "bus_station",
   "airport",
+  // Services / offices
   "real_estate_service",
   "professional_service",
+  "office",
+  "coworking_space",
   "lawyer",
   "accountant",
   "post_office",
   "police_station",
+  // Worship
   "place_of_worship",
   "mosque",
   "church",
+  "synagogue",
+  "hindu_temple",
+  "buddhist_temple",
 ] as const;

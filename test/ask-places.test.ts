@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { askPlaces, type AskPlacesDeps } from "../src/ask-places.js";
+import { askPlaces, DEFAULT_SEARCH_RADIUS_METERS, type AskPlacesDeps } from "../src/ask-places.js";
 import { AskPlacesInternalError, AskPlacesUsageError } from "../src/errors.js";
 import type { UnderstoodQuestion } from "../src/llm/understand.js";
 import type { Place } from "../src/types.js";
@@ -66,12 +66,12 @@ describe("askPlaces", () => {
 
     expect(d.understand).toHaveBeenCalledWith("cafés near Lac 2, Tunis", { kind: "model" }, "openai");
     expect(d.geocode).toHaveBeenCalledWith({ place: "Lac 2, Tunis", countryCode: "TN" });
-    expect(d.searchPlaces).toHaveBeenCalledWith(d.runQuery, {
-      release: "2026-10-21.0",
-      area: located.area,
-      categories: ["cafe", "coffee_shop"],
-      limit: 20,
-    });
+    const searchArg = d.searchPlaces.mock.calls[0]![1];
+    expect(searchArg.release).toBe("2026-10-21.0");
+    expect(searchArg.categories).toEqual(["cafe", "coffee_shop"]);
+    expect(searchArg.limit).toBe(20);
+    // Default 1.5 km around the geocoded place when no radius is given.
+    expect(searchArg.area.north - located.center.lat).toBeCloseTo(DEFAULT_SEARCH_RADIUS_METERS / 111_320, 5);
     expect(d.addTravelTimes).toHaveBeenCalled();
     expect(d.addTransitEstimates).toHaveBeenCalled();
     expect(places).toHaveLength(1);
@@ -116,8 +116,28 @@ describe("askPlaces", () => {
     expect(d.geocode).not.toHaveBeenCalled();
     expect(d.searchPlaces).toHaveBeenCalledOnce();
     const searchArg = d.searchPlaces.mock.calls[0]![1];
-    expect(searchArg.area.west).toBeLessThan(origin.lng);
-    expect(searchArg.area.east).toBeGreaterThan(origin.lng);
+    expect(searchArg.area.north - origin.lat).toBeCloseTo(DEFAULT_SEARCH_RADIUS_METERS / 111_320, 5);
+  });
+
+  it("defaults to 1.5 km when no radius is set", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: null })),
+    });
+    const origin = { lat: 36.84, lng: 10.27 };
+    await askPlaces("cafés near me", { ...options, origin }, d);
+    expect(d.searchPlaces.mock.calls[0]![1].area.north - origin.lat).toBeCloseTo(1_500 / 111_320, 5);
+  });
+
+  it("returns places nearest to the origin first", async () => {
+    const farther: Place = { ...cafe, name: "Farther", location: { lat: 36.841, lng: 10.27 } };
+    const nearer: Place = { ...cafe, name: "Nearer", location: { lat: 36.8402, lng: 10.27 } };
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null })),
+      searchPlaces: vi.fn(async () => [farther, nearer]),
+    });
+    const origin = { lat: 36.84, lng: 10.27 };
+    const places = await askPlaces("cafés near me", { ...options, origin }, d);
+    expect(places.map((p) => p.name)).toEqual(["Nearer", "Farther"]);
   });
 
   it("uses the asked radius around origin and drops places outside it", async () => {

@@ -1,4 +1,4 @@
-export { askPlaces } from "./ask-places.js";
+export { askPlaces, DEFAULT_SEARCH_RADIUS_METERS } from "./ask-places.js";
 export {
   AskPlacesError,
   AskPlacesInternalError,

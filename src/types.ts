@@ -22,7 +22,7 @@ export type AskPlacesOptions = {
   origin?: LatLng;
   /**
    * Max straight-line distance in meters from the search center (origin, or the place named in the question).
-   * Overrides any radius mentioned in the question. Example: 500 for "within 500m".
+   * Overrides any radius in the question. When omitted (and the question has no radius), defaults to 1500 m.
    */
   radiusMeters?: number;
 };

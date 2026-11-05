@@ -13,8 +13,11 @@ import { addTravelTimes, travelOrigin } from "./routing/travel-times.js";
 import type { AskPlacesOptions, LatLng, Place } from "./types.js";
 import { validateInput } from "./validate.js";
 
-/** Default search radius when the developer only passes GPS (e.g. "cafés near me"). */
-export const ORIGIN_SEARCH_RADIUS_METERS = 2_000;
+/** Default search radius when neither the question nor options set one (1.5 km). */
+export const DEFAULT_SEARCH_RADIUS_METERS = 1_500;
+
+/** @deprecated Use DEFAULT_SEARCH_RADIUS_METERS. */
+export const ORIGIN_SEARCH_RADIUS_METERS = DEFAULT_SEARCH_RADIUS_METERS;
 
 export type AskPlacesDeps = {
   understand?: (question: string, model: ReturnType<typeof createModel>, provider: string) => Promise<UnderstoodQuestion>;
@@ -69,46 +72,45 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
     categories,
     limit,
   });
-  // BBox search is a square; when a radius applies, keep only places inside the circle.
-  const inRadius =
-    searchCenter.radiusMeters === null
-      ? found
-      : found.filter((place) => distanceMeters(searchCenter.center, place.location) <= searchCenter.radiusMeters!);
-  if (inRadius.length === 0) return [];
 
   const origin = travelOrigin(options.origin, searchCenter.center);
-  const withTravel = await doTravel(inRadius, origin);
+  const nearby = found
+    .filter((place) => distanceMeters(searchCenter.center, place.location) <= searchCenter.radiusMeters)
+    .sort((a, b) => distanceMeters(origin, a.location) - distanceMeters(origin, b.location));
+  if (nearby.length === 0) return [];
+
+  const withTravel = await doTravel(nearby, origin);
   return doTransit(withTravel, model, options.provider);
 }
 
-/** options.radiusMeters > LLM > text parse (e.g. "within 500m"). */
+/**
+ * options.radiusMeters > LLM > text parse (e.g. "within 500m") > 1.5 km default.
+ * Always returns a concrete radius so results stay local and comparable.
+ */
 export function resolveRadiusMeters(
   question: string,
   options: Pick<AskPlacesOptions, "radiusMeters">,
   intent: Pick<UnderstoodQuestion, "radiusMeters">,
-): number | null {
-  return options.radiusMeters ?? intent.radiusMeters ?? parseRadiusFromQuestion(question);
+): number {
+  return options.radiusMeters ?? intent.radiusMeters ?? parseRadiusFromQuestion(question) ?? DEFAULT_SEARCH_RADIUS_METERS;
 }
 
 async function resolveSearchArea(
   intent: UnderstoodQuestion,
   origin: LatLng | undefined,
-  radiusMeters: number | null,
+  radiusMeters: number,
   doGeocode: typeof geocode,
-): Promise<{ center: LatLng; area: ReturnType<typeof bboxAround>; radiusMeters: number | null } | null> {
+): Promise<{ center: LatLng; area: ReturnType<typeof bboxAround>; radiusMeters: number } | null> {
+  // Named place in the question (no GPS needed): geocode it, then search within the radius.
   if (intent.where !== "") {
     const located = await doGeocode({ place: intent.where, countryCode: intent.countryCode ?? undefined });
     if (!located) return null;
-    if (radiusMeters !== null) {
-      return { center: located.center, area: bboxAround(located.center, radiusMeters), radiusMeters };
-    }
-    return { center: located.center, area: located.area, radiusMeters: null };
+    return { center: located.center, area: bboxAround(located.center, radiusMeters), radiusMeters };
   }
 
-  // "cafés near me" / "within 500m" with GPS: search around the developer's origin.
+  // "near me" / no place name: need the developer's GPS origin.
   if (origin) {
-    const meters = radiusMeters ?? ORIGIN_SEARCH_RADIUS_METERS;
-    return { center: origin, area: bboxAround(origin, meters), radiusMeters: meters };
+    return { center: origin, area: bboxAround(origin, radiusMeters), radiusMeters };
   }
   return null;
 }

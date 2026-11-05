@@ -8,6 +8,7 @@ describe("public API", () => {
       "AskPlacesInternalError",
       "AskPlacesUsageError",
       "DEFAULT_MODELS",
+      "DEFAULT_SEARCH_RADIUS_METERS",
       "MAX_RESULTS",
       "SUPPORTED_PROVIDERS",
       "askPlaces",

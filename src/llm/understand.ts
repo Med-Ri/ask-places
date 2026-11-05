@@ -33,18 +33,25 @@ const schema = z.object({
   radiusMeters: z.number().nullable(),
 });
 
-const SYSTEM = `You extract a place search from a user's question.
+const SYSTEM = `You extract a place search from a user's question in ANY language (English, French, Arabic, Darija, Tunisian Arabic in Latin or Arabic script, Spanish, etc.).
 Return JSON that matches the schema.
 
 Rules:
-- "what": the kind of place in the user's language, or "" if none is named.
-- "where": the location to search (city, neighbourhood, landmark, address). Use "" when the user only means "near me" / their current position / a radius around themselves. Do not put "radius", distance words, or "near me" into "where".
-- "countryCode": ISO 3166-1 alpha-2 uppercase when you can infer it from "where", otherwise null. Never invent a country.
-- "categories": 1 to 5 Overture Places category ids that match "what". Match the user's specificity: "restaurant(s)" -> restaurant / *_restaurant (not cafe, coffee_shop, tea_room, bakery); "café(s)" -> cafe, coffee_shop; "bank"/"banque"/"banc" -> bank_or_credit_union and bank (not a park bench). Add a broader parent only when useful. Use [] when the question has no place type.
-- Prefer ids from this list when they fit: ${COMMON_CATEGORIES.join(", ")}.
-- "limit": a positive integer when the user asks for a number of places (e.g. "3 pharmacies" -> 3), otherwise null. Cap at ${MAX_RESULTS}.
-- "radiusMeters": distance in meters when the user asks for a radius / "within X" / "in a radius of X" (accept misspellings like "raduis"). Convert km to meters (0.5 km -> 500). Convert miles to meters (1 mile -> 1609). Otherwise null. Cap at ${MAX_RADIUS_METERS}.
-- Do not invent places. Only interpret the question.`;
+- Understand intent and context, not only keywords. Examples:
+  - "أنا مسلم و أريد أن أصلي أين يمكنني الذهاب" / "I need a place to pray" → mosque (or place_of_worship).
+  - "I need coffee" / "un café" / "قهوة" → cafe, coffee_shop.
+  - "banc" / "banque" / "bank" (Maghreb French: banc = bank, not a park bench) → bank_or_credit_union, bank.
+  - "magasin" / "magsain" / "store" / "shop" → shopping, supermarket, convenience_store as fits.
+  - "docteur" / "doctor" / "طبيب" → doctors_office, clinic.
+  - "bureau" / "office" → office, professional_service.
+- Fix obvious typos and misspellings before mapping (farmasie/farmacie → pharmacy, resturant → restaurant, coffe → cafe, pharmacie → pharmacy, mosquee → mosque).
+- "what": short label for the kind of place in the user's language (corrected spelling ok), or "" if none.
+- "where": city, neighbourhood, landmark, or address to search. Use "" when the user only means "near me" / their GPS / a radius around themselves, or when no place name appears. Never put radius words, "near me", or the place type into "where".
+- "countryCode": ISO 3166-1 alpha-2 uppercase when you can infer it from "where" or clear context, otherwise null. Never invent a country.
+- "categories": 1 to 5 Overture Places category ids for "what". Prefer ids from this list when they fit: ${COMMON_CATEGORIES.join(", ")}. You may use other valid Overture snake_case ids if needed. Match specificity (restaurants ≠ cafes). Use [] only when there is truly no place type.
+- "limit": positive integer when the user asks for a count of places, otherwise null. Cap at ${MAX_RESULTS}.
+- "radiusMeters": meters when the user asks for a radius / "within X" / "dans un rayon de X" / "في نطاق" (accept typos like "raduis"). Convert km → meters, miles → meters (1 mile → 1609). Otherwise null. Cap at ${MAX_RADIUS_METERS}.
+- Do not invent place names. Only interpret what to search for.`;
 
 /**
  * Asks the developer's LLM to turn a free-text question into a structured place search.

@@ -9,19 +9,40 @@ const EXPAND: Record<string, readonly string[]> = {
   cafe: ["cafe", "coffee_shop"],
   café: ["cafe", "coffee_shop"],
   coffee_shop: ["cafe", "coffee_shop"],
+  coffee: ["cafe", "coffee_shop"],
   restaurant: ["restaurant"],
+  bar: ["bar", "pub"],
+  pub: ["bar", "pub"],
+  pharmacy: ["pharmacy"],
+  pharmacie: ["pharmacy"],
+  doctor: ["doctors_office", "clinic", "medical_center"],
+  doctors_office: ["doctors_office", "clinic", "medical_center"],
+  clinic: ["clinic", "doctors_office", "medical_center"],
+  mosque: ["mosque", "place_of_worship"],
+  church: ["church", "place_of_worship"],
+  store: ["shopping", "supermarket", "convenience_store", "department_store"],
+  shop: ["shopping", "supermarket", "convenience_store"],
+  shopping: ["shopping", "supermarket", "convenience_store", "department_store"],
+  supermarket: ["supermarket", "grocery_store", "convenience_store"],
+  office: ["office", "professional_service", "coworking_space"],
+  professional_service: ["professional_service", "office"],
 };
 
 /**
- * Extra categories inferred from the question text when the LLM misses a synonym
- * (e.g. French "banc" / "banque" for a bank).
+ * Latin-script backups when the LLM misses a synonym or typo.
+ * Multilingual intent (Arabic, etc.) is handled by the LLM prompt.
  */
 const QUESTION_HINTS: { pattern: RegExp; categories: readonly string[] }[] = [
-  // "banc" is often used for bank in Maghreb French; also match banque/bank.
   { pattern: /\b(bancs?|banques?|banks?)\b/i, categories: ["bank", "bank_or_credit_union", "atm"] },
   { pattern: /\b(atms?|distributeurs?(?:\s+automatiques?)?)\b/i, categories: ["atm", "bank_or_credit_union"] },
-  { pattern: /\b(caf[eé]s?|coffee\s*shops?)\b/i, categories: ["cafe", "coffee_shop"] },
-  { pattern: /\b(pharmacies?)\b/i, categories: ["pharmacy"] },
+  { pattern: /\b(caf[eé]s?|coffe+e?\s*shops?|coff+e+)\b/i, categories: ["cafe", "coffee_shop"] },
+  { pattern: /\b(bars?|pubs?)\b/i, categories: ["bar", "pub"] },
+  { pattern: /\b((?:ph|f)arma(?:cie|sie|cy|cyie)s?|pharmacies?)\b/i, categories: ["pharmacy"] },
+  { pattern: /\b(mags?\w*|magasins?|stores?|shops?)\b/i, categories: ["shopping", "supermarket", "convenience_store"] },
+  { pattern: /\b(docteurs?|doctors?|m[eé]decins?)\b/i, categories: ["doctors_office", "clinic"] },
+  { pattern: /\b(bureaux?|offices?)\b/i, categories: ["office", "professional_service"] },
+  { pattern: /\b(mosqu[eé]e?s?|masjid)\b/i, categories: ["mosque", "place_of_worship"] },
+  { pattern: /\b(restaurants?|rest+aurants?)\b/i, categories: ["restaurant"] },
 ];
 
 /**

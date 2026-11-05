@@ -17,7 +17,14 @@ describe("expandCategories", () => {
     );
   });
 
+  it("maps farmasie/magasin typos and synonyms", () => {
+    expect(expandCategories([], "farmasie near me")).toContain("pharmacy");
+    expect(expandCategories([], "magsain")).toEqual(
+      expect.arrayContaining(["shopping", "supermarket", "convenience_store"]),
+    );
+  });
+
   it("keeps unrelated categories unchanged", () => {
-    expect(expandCategories(["pharmacy"], "pharmacies near me")).toEqual(["pharmacy"]);
+    expect(expandCategories(["pharmacy"], "looking for something")).toEqual(["pharmacy"]);
   });
 });
