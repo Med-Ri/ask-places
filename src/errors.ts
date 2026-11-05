@@ -6,6 +6,7 @@ export type UsageErrorCode =
   | "MISSING_API_KEY"
   | "INVALID_API_KEY"
   | "PROVIDER_QUOTA"
+  | "PROVIDER_TIMEOUT"
   | "INVALID_ORIGIN";
 
 export type AskPlacesErrorCode = UsageErrorCode | "INTERNAL_ERROR";

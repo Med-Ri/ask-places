@@ -2,6 +2,7 @@ import { generateText, Output, type LanguageModel } from "ai";
 import { z } from "zod";
 import type { EstimatedDuration, Place } from "../types.js";
 import { usageErrorFromLlm } from "./errors.js";
+import { llmAbortSignal } from "./timeout.js";
 
 const schema = z.object({
   minutes: z.array(z.number().int().nonnegative()),
@@ -44,7 +45,7 @@ export async function addTransitEstimates(
       model,
       temperature: 0,
       maxRetries: 1,
-      abortSignal: AbortSignal.timeout(30_000),
+      abortSignal: llmAbortSignal(),
       system: SYSTEM,
       prompt: `Estimate public-transit minutes for each place:\n${prompt}`,
       output: Output.object({ schema, name: "transit_times", description: "Transit minutes per place, same order" }),

@@ -1,5 +1,6 @@
 import { APICallError, NoSuchModelError, RetryError } from "ai";
 import { AskPlacesUsageError } from "../errors.js";
+import { isTimeoutError, LLM_TIMEOUT_MS } from "./timeout.js";
 
 /** Follow RetryError to the last real provider error (AI SDK wraps failures after retries). */
 export function unwrapLlmError(error: unknown): unknown {
@@ -66,6 +67,13 @@ export function usageErrorFromLlm(error: unknown, provider: string): AskPlacesUs
     return new AskPlacesUsageError(
       "INVALID_OPTIONS",
       `askplaces: the model for "${provider}" was not found or is no longer available. Pass a valid options.model, or omit it to use the default.`,
+    );
+  }
+
+  if (isTimeoutError(inner) || isTimeoutError(error)) {
+    return new AskPlacesUsageError(
+      "PROVIDER_TIMEOUT",
+      `askplaces: the "${provider}" LLM call timed out after ${LLM_TIMEOUT_MS / 1000}s. Try again, use a faster model, or check your network.`,
     );
   }
 

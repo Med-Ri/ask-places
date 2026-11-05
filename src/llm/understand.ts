@@ -3,6 +3,7 @@ import { z } from "zod";
 import { MAX_RESULTS } from "../overture/places.js";
 import { COMMON_CATEGORIES } from "./categories.js";
 import { usageErrorFromLlm } from "./errors.js";
+import { llmAbortSignal } from "./timeout.js";
 
 export type UnderstoodQuestion = {
   /** What to look for, e.g. "cafés". Empty when the question has no place type. */
@@ -47,7 +48,7 @@ export async function understandQuestion(question: string, model: LanguageModel,
       model,
       temperature: 0,
       maxRetries: 1,
-      abortSignal: AbortSignal.timeout(30_000),
+      abortSignal: llmAbortSignal(),
       system: SYSTEM,
       prompt: question,
       output: Output.object({ schema, name: "place_search", description: "Structured place search extracted from the question" }),

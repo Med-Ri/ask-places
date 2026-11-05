@@ -89,8 +89,16 @@ describe("usageErrorFromLlm", () => {
     expect(error?.message).toContain("no longer available");
   });
 
+  it("maps AbortSignal TimeoutError to PROVIDER_TIMEOUT", () => {
+    const timeout = new DOMException("The operation was aborted due to timeout", "TimeoutError");
+    const error = usageErrorFromLlm(timeout, "google");
+    expect(error?.code).toBe("PROVIDER_TIMEOUT");
+    expect(error?.message).toContain('"google"');
+    expect(error?.message).toContain("timed out");
+  });
+
   it("returns null for other errors", () => {
-    expect(usageErrorFromLlm(new Error("timeout"), "openai")).toBeNull();
+    expect(usageErrorFromLlm(new Error("socket hung"), "openai")).toBeNull();
     expect(isUnknownModelError(apiError(404, "bucket missing"))).toBe(false);
   });
 });
