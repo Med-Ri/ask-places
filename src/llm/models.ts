@@ -13,7 +13,7 @@ import type { Provider } from "../types.js";
 export const DEFAULT_MODELS = {
   openai: "gpt-4.1-mini",
   anthropic: "claude-haiku-4-5",
-  google: "gemini-2.5-flash",
+  google: "gemini-3.8-flash",
   xai: "grok-4.20-non-reasoning",
   deepseek: "deepseek-flash",
 } as const satisfies Record<Provider, string>;

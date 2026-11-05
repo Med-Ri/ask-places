@@ -1,6 +1,12 @@
 import { APICallError, NoSuchModelError, RetryError } from "ai";
 import { describe, expect, it } from "vitest";
-import { isInvalidApiKeyError, isProviderQuotaError, unwrapLlmError, usageErrorFromLlm } from "../src/llm/errors.js";
+import {
+  isInvalidApiKeyError,
+  isProviderQuotaError,
+  isUnknownModelError,
+  unwrapLlmError,
+  usageErrorFromLlm,
+} from "../src/llm/errors.js";
 
 function apiError(statusCode: number, message: string, responseBody = "") {
   return new APICallError({ message, url: "https://x", requestBodyValues: {}, statusCode, responseBody });
@@ -72,7 +78,19 @@ describe("usageErrorFromLlm", () => {
     expect(error?.message).toContain('"anthropic"');
   });
 
+  it("maps a retired Google model 404 to INVALID_OPTIONS", () => {
+    const gone = apiError(
+      404,
+      "This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use models/gemini-3.8-flash",
+    );
+    expect(isUnknownModelError(gone)).toBe(true);
+    const error = usageErrorFromLlm(gone, "google");
+    expect(error?.code).toBe("INVALID_OPTIONS");
+    expect(error?.message).toContain("no longer available");
+  });
+
   it("returns null for other errors", () => {
     expect(usageErrorFromLlm(new Error("timeout"), "openai")).toBeNull();
+    expect(isUnknownModelError(apiError(404, "bucket missing"))).toBe(false);
   });
 });

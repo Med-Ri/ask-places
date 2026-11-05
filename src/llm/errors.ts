@@ -17,14 +17,26 @@ export function isInvalidApiKeyError(error: unknown): boolean {
 }
 
 const QUOTA_HINT = /credit|billing|quota|insufficient|payment|balance|plan|exceeded|rate.?limit/i;
+const MODEL_GONE_HINT = /model|no longer available|not found|not supported|unknown model/i;
+
+function errorText(error: unknown): string {
+  if (!APICallError.isInstance(error)) return "";
+  return `${error.message}\n${typeof error.responseBody === "string" ? error.responseBody : ""}`;
+}
 
 /** No credits, billing required, or hard rate limit — the developer's provider account must be fixed. */
 export function isProviderQuotaError(error: unknown): boolean {
   const inner = unwrapLlmError(error);
   if (!APICallError.isInstance(inner)) return false;
   if (inner.statusCode === 402) return true;
-  const text = `${inner.message}\n${typeof inner.responseBody === "string" ? inner.responseBody : ""}`;
-  return (inner.statusCode === 429 || inner.statusCode === 403) && QUOTA_HINT.test(text);
+  return (inner.statusCode === 429 || inner.statusCode === 403) && QUOTA_HINT.test(errorText(inner));
+}
+
+/** Provider says the model id is unknown or retired (e.g. Google 404 for gemini-2.5-flash). */
+export function isUnknownModelError(error: unknown): boolean {
+  if (NoSuchModelError.isInstance(error) || NoSuchModelError.isInstance(unwrapLlmError(error))) return true;
+  const inner = unwrapLlmError(error);
+  return APICallError.isInstance(inner) && inner.statusCode === 404 && MODEL_GONE_HINT.test(errorText(inner));
 }
 
 /**
@@ -50,10 +62,10 @@ export function usageErrorFromLlm(error: unknown, provider: string): AskPlacesUs
     );
   }
 
-  if (NoSuchModelError.isInstance(inner) || NoSuchModelError.isInstance(error)) {
+  if (isUnknownModelError(error)) {
     return new AskPlacesUsageError(
       "INVALID_OPTIONS",
-      `askplaces: the model for "${provider}" was not found. Pass a valid options.model, or omit it to use the default.`,
+      `askplaces: the model for "${provider}" was not found or is no longer available. Pass a valid options.model, or omit it to use the default.`,
     );
   }
 
