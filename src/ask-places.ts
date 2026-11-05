@@ -1,6 +1,7 @@
 import { AskPlacesInternalError } from "./errors.js";
 import { bboxAround, distanceMeters } from "./geo.js";
 import { geocode } from "./geocode/geocode.js";
+import { expandCategories } from "./llm/expand-categories.js";
 import { addTransitEstimates } from "./llm/transit.js";
 import { createModel } from "./llm/models.js";
 import { understandQuestion, type UnderstoodQuestion } from "./llm/understand.js";
@@ -61,10 +62,11 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
 
   const release = await getRelease();
   const limit = intent.limit ?? MAX_RESULTS;
+  const categories = expandCategories(intent.categories, question);
   const found = await doSearch(runSql, {
     release,
     area: searchCenter.area,
-    categories: intent.categories,
+    categories,
     limit,
   });
   // BBox search is a square; when a radius applies, keep only places inside the circle.

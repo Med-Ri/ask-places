@@ -78,6 +78,22 @@ describe("askPlaces", () => {
     expect(places[0]?.travelTime).toEqual({ walking: 5, driving: 2, cycling: 2, transit: { minutes: 8, estimated: true } });
   });
 
+  it("expands bank categories so Overture bank_or_credit_union matches", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({
+        ...intent,
+        what: "banc",
+        where: "",
+        countryCode: null,
+        categories: ["bank"],
+      })),
+    });
+    await askPlaces("banc near me", { ...options, origin: { lat: 36.84, lng: 10.27 } }, d);
+    expect(d.searchPlaces.mock.calls[0]![1].categories).toEqual(
+      expect.arrayContaining(["bank", "bank_or_credit_union", "atm"]),
+    );
+  });
+
   it("returns [] when the place cannot be geocoded", async () => {
     const d = deps({ geocode: vi.fn(async () => null) });
     expect(await askPlaces("cafés in Nowhereville", options, d)).toEqual([]);

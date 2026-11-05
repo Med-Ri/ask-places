@@ -31,6 +31,8 @@ export const COMMON_CATEGORIES = [
   "dental_clinic",
   "doctors_office",
   "veterinary_service",
+  "financial_service",
+  "bank_or_credit_union",
   "bank",
   "atm",
   "supermarket",
