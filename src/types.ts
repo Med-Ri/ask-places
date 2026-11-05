@@ -16,6 +16,8 @@ export type AskPlacesOptions = {
   provider: Provider;
   /** The developer's own API key for that provider. Keep it on the server. */
   apiKey: string;
+  /** Model id for that provider. When omitted, a default is used (see DEFAULT_MODELS). */
+  model?: string;
   /** Where travel times are measured from (e.g. the user's GPS position). Defaults to the location named in the question. */
   origin?: LatLng;
 };

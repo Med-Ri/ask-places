@@ -40,6 +40,18 @@ describe("validateInput: valid input", () => {
     const result = validateInput("cafés", { ...validOptions, debug: true });
     expect(result.options).toEqual({ provider: "openai", apiKey: "sk-test-123" });
   });
+
+  it("keeps an optional model and trims it", () => {
+    expect(validateInput("cafés", { ...validOptions, model: "  gpt-4o-mini  " }).options.model).toBe("gpt-4o-mini");
+  });
+
+  it.each([
+    ["empty", ""],
+    ["whitespace only", "   "],
+    ["not a string", 42],
+  ])("rejects a model that is %s", (_label, model) => {
+    expect(errorFrom("cafés", { ...validOptions, model }).code).toBe("INVALID_OPTIONS");
+  });
 });
 
 describe("validateInput: question", () => {

@@ -7,11 +7,19 @@ describe("public API", () => {
       "AskPlacesError",
       "AskPlacesInternalError",
       "AskPlacesUsageError",
+      "DEFAULT_MODELS",
+      "MAX_RESULTS",
       "SUPPORTED_PROVIDERS",
+      "askPlaces",
     ]);
   });
 
   it("supports the five most popular LLM providers", () => {
     expect(askplaces.SUPPORTED_PROVIDERS).toEqual(["openai", "anthropic", "google", "xai", "deepseek"]);
+  });
+
+  it("exposes a default model for each provider and a 20-result cap", () => {
+    expect(askplaces.MAX_RESULTS).toBe(20);
+    expect(Object.keys(askplaces.DEFAULT_MODELS).sort()).toEqual([...askplaces.SUPPORTED_PROVIDERS].sort());
   });
 });

@@ -52,9 +52,15 @@ function validateOptions(options: unknown): AskPlacesOptions {
 
   const provider = validateProvider(options["provider"]);
   const apiKey = validateApiKey(options["apiKey"], provider);
+  const model = options["model"] === undefined ? undefined : validateModel(options["model"]);
   const origin = options["origin"] === undefined ? undefined : validateOrigin(options["origin"]);
 
-  return origin === undefined ? { provider, apiKey } : { provider, apiKey, origin };
+  return {
+    provider,
+    apiKey,
+    ...(model === undefined ? {} : { model }),
+    ...(origin === undefined ? {} : { origin }),
+  };
 }
 
 function validateProvider(provider: unknown): Provider {
@@ -77,6 +83,16 @@ function validateApiKey(apiKey: unknown, provider: Provider): string {
     );
   }
   return apiKey.trim();
+}
+
+function validateModel(model: unknown): string {
+  if (typeof model !== "string" || model.trim() === "") {
+    throw new AskPlacesUsageError(
+      "INVALID_OPTIONS",
+      `askplaces: options.model must be a non-empty string when provided, received ${describe(model)}.`,
+    );
+  }
+  return model.trim();
 }
 
 function validateOrigin(origin: unknown): LatLng {

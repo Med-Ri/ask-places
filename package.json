@@ -32,7 +32,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "try:search": "tsx scripts/try-search.ts"
+    "try:search": "tsx scripts/try-search.ts",
+    "try:ask": "tsx scripts/try-ask.ts"
   },
   "keywords": [
     "places",
@@ -51,6 +52,13 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
-    "@duckdb/node-api": "^2.0.0-r.1"
+    "@ai-sdk/anthropic": "^4.0.97",
+    "@ai-sdk/deepseek": "^3.0.80",
+    "@ai-sdk/google": "^4.0.112",
+    "@ai-sdk/openai": "^4.0.109",
+    "@ai-sdk/xai": "^5.0.39",
+    "@duckdb/node-api": "^2.0.0-r.1",
+    "ai": "^7.0.163",
+    "zod": "^4.6.7"
   }
 }

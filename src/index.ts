@@ -1,3 +1,4 @@
+export { askPlaces } from "./ask-places.js";
 export {
   AskPlacesError,
   AskPlacesInternalError,
@@ -5,6 +6,8 @@ export {
   type AskPlacesErrorCode,
   type UsageErrorCode,
 } from "./errors.js";
+export { DEFAULT_MODELS } from "./llm/models.js";
+export { MAX_RESULTS } from "./overture/places.js";
 export {
   SUPPORTED_PROVIDERS,
   type AskPlacesOptions,

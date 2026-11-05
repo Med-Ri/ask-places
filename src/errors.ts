@@ -4,6 +4,8 @@ export type UsageErrorCode =
   | "INVALID_OPTIONS"
   | "UNSUPPORTED_PROVIDER"
   | "MISSING_API_KEY"
+  | "INVALID_API_KEY"
+  | "PROVIDER_QUOTA"
   | "INVALID_ORIGIN";
 
 export type AskPlacesErrorCode = UsageErrorCode | "INTERNAL_ERROR";
