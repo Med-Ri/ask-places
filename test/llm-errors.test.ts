@@ -98,7 +98,7 @@ describe("usageErrorFromLlm", () => {
     const error = usageErrorFromLlm(gone, "google");
     expect(error?.code).toBe("INVALID_OPTIONS");
     expect(error?.message).toContain("gemini-2.5-flash");
-    expect(error?.message).toContain("gemini-3.8-flash");
+    expect(error?.message).toContain("no longer available to new users");
   });
 
   it("maps AbortSignal TimeoutError to PROVIDER_TIMEOUT", () => {
