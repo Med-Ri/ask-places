@@ -40,6 +40,7 @@ const envKey: Record<Provider, string | undefined> = {
   google: process.env["GOOGLE_GENERATIVE_AI_API_KEY"] ?? process.env["GOOGLE_API_KEY"],
   xai: process.env["XAI_API_KEY"],
   deepseek: process.env["DEEPSEEK_API_KEY"],
+  groq: process.env["GROQ_API_KEY"],
 };
 const apiKey = envKey[provider];
 if (!apiKey) {

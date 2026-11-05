@@ -84,7 +84,7 @@ describe("validateInput: options", () => {
     expect(errorFrom("cafés", options).code).toBe("INVALID_OPTIONS");
   });
 
-  it.each(["openai", "anthropic", "google", "xai", "deepseek"])("accepts the %s provider", (provider) => {
+  it.each(["openai", "anthropic", "google", "xai", "deepseek", "groq"])("accepts the %s provider", (provider) => {
     expect(validateInput("cafés", { provider, apiKey: "key-123" }).options.provider).toBe(provider);
   });
 
@@ -92,7 +92,7 @@ describe("validateInput: options", () => {
     const error = errorFrom("cafés", { ...validOptions, provider: "mistral" });
     expect(error.code).toBe("UNSUPPORTED_PROVIDER");
     expect(error.message).toContain('"mistral"');
-    expect(error.message).toContain('"openai", "anthropic", "google", "xai", "deepseek"');
+    expect(error.message).toContain('"openai", "anthropic", "google", "xai", "deepseek", "groq"');
   });
 
   it("is case-sensitive about provider names", () => {

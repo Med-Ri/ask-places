@@ -14,8 +14,8 @@ describe("public API", () => {
     ]);
   });
 
-  it("supports the five most popular LLM providers", () => {
-    expect(askplaces.SUPPORTED_PROVIDERS).toEqual(["openai", "anthropic", "google", "xai", "deepseek"]);
+  it("supports the configured LLM providers", () => {
+    expect(askplaces.SUPPORTED_PROVIDERS).toEqual(["openai", "anthropic", "google", "xai", "deepseek", "groq"]);
   });
 
   it("exposes a default model for each provider and a 20-result cap", () => {

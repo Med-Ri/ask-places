@@ -1,6 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogle } from "@ai-sdk/google";
+import { createGroq } from "@ai-sdk/groq";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createXai } from "@ai-sdk/xai";
 import type { LanguageModel } from "ai";
@@ -16,6 +17,8 @@ export const DEFAULT_MODELS = {
   google: "gemini-3.8-flash",
   xai: "grok-4.20-non-reasoning",
   deepseek: "deepseek-flash",
+  /** Groq (console.groq.com) — not the same as xAI Grok. Keys start with gsk_. */
+  groq: "llama-3.3-70b-versatile",
 } as const satisfies Record<Provider, string>;
 
 /** Builds a Vercel AI SDK model from the developer's provider + API key (+ optional model id). */
@@ -32,5 +35,7 @@ export function createModel(provider: Provider, apiKey: string, model?: string):
       return createXai({ apiKey })(modelId);
     case "deepseek":
       return createDeepSeek({ apiKey })(modelId);
+    case "groq":
+      return createGroq({ apiKey })(modelId);
   }
 }
