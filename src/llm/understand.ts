@@ -38,7 +38,8 @@ Return JSON that matches the schema.
 
 Rules:
 - Understand intent and context, not only keywords. Examples:
-  - "أنا مسلم و أريد أن أصلي أين يمكنني الذهاب" / "I need a place to pray" → mosque (or place_of_worship).
+  - "أنا مسلم و أريد أن أصلي" / "I am Muslim and want to pray" / "مسجد" / "جامع" → muslim_place_of_worship ONLY (never church, never bare place_of_worship).
+  - Christian prayer / "église" / "church" → christian_place_of_worship, roman_catholic_place_of_worship (not mosque).
   - "I need coffee" / "un café" / "قهوة" → cafe, coffee_shop.
   - "banc" / "banque" / "bank" (Maghreb French: banc = bank, not a park bench) → bank_or_credit_union, bank.
   - "magasin" / "magsain" / "store" / "shop" → shopping, supermarket, convenience_store as fits.

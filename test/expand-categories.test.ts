@@ -24,6 +24,13 @@ describe("expandCategories", () => {
     );
   });
 
+  it("maps Muslim prayer intent to mosques only, not churches", () => {
+    const cats = expandCategories(["place_of_worship", "mosque"], "أنا مسلم و أريد أن أصلي أين يمكنني الذهاب");
+    expect(cats).toContain("muslim_place_of_worship");
+    expect(cats).not.toContain("place_of_worship");
+    expect(cats).not.toContain("christian_place_of_worship");
+  });
+
   it("keeps unrelated categories unchanged", () => {
     expect(expandCategories(["pharmacy"], "looking for something")).toEqual(["pharmacy"]);
   });

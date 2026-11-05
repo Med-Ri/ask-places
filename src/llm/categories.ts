@@ -84,8 +84,11 @@ export const COMMON_CATEGORIES = [
   "accountant",
   "post_office",
   "police_station",
-  // Worship
+  // Worship (Overture uses religion-specific ids; "mosque"/"church" alone often match nothing)
   "place_of_worship",
+  "muslim_place_of_worship",
+  "christian_place_of_worship",
+  "roman_catholic_place_of_worship",
   "mosque",
   "church",
   "synagogue",

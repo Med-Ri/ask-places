@@ -1,6 +1,6 @@
 /**
  * Overture often uses broader ids than the short names people (and LLMs) pick.
- * e.g. most bank branches are "bank_or_credit_union", not "bank".
+ * e.g. mosques are "muslim_place_of_worship", not "mosque"; banks are "bank_or_credit_union".
  */
 const EXPAND: Record<string, readonly string[]> = {
   bank: ["bank", "bank_or_credit_union"],
@@ -18,8 +18,11 @@ const EXPAND: Record<string, readonly string[]> = {
   doctor: ["doctors_office", "clinic", "medical_center"],
   doctors_office: ["doctors_office", "clinic", "medical_center"],
   clinic: ["clinic", "doctors_office", "medical_center"],
-  mosque: ["mosque", "place_of_worship"],
-  church: ["church", "place_of_worship"],
+  // Overture has no plain "mosque" / "church" leaf that matches; use religion-specific ids.
+  mosque: ["muslim_place_of_worship"],
+  muslim_place_of_worship: ["muslim_place_of_worship"],
+  church: ["christian_place_of_worship", "roman_catholic_place_of_worship"],
+  christian_place_of_worship: ["christian_place_of_worship", "roman_catholic_place_of_worship"],
   store: ["shopping", "supermarket", "convenience_store", "department_store"],
   shop: ["shopping", "supermarket", "convenience_store"],
   shopping: ["shopping", "supermarket", "convenience_store", "department_store"],
@@ -29,8 +32,7 @@ const EXPAND: Record<string, readonly string[]> = {
 };
 
 /**
- * Latin-script backups when the LLM misses a synonym or typo.
- * Multilingual intent (Arabic, etc.) is handled by the LLM prompt.
+ * Backups when the LLM misses a synonym, typo, or Arabic prayer intent.
  */
 const QUESTION_HINTS: { pattern: RegExp; categories: readonly string[] }[] = [
   { pattern: /\b(bancs?|banques?|banks?)\b/i, categories: ["bank", "bank_or_credit_union", "atm"] },
@@ -41,7 +43,11 @@ const QUESTION_HINTS: { pattern: RegExp; categories: readonly string[] }[] = [
   { pattern: /\b(mags?\w*|magasins?|stores?|shops?)\b/i, categories: ["shopping", "supermarket", "convenience_store"] },
   { pattern: /\b(docteurs?|doctors?|m[eé]decins?)\b/i, categories: ["doctors_office", "clinic"] },
   { pattern: /\b(bureaux?|offices?)\b/i, categories: ["office", "professional_service"] },
-  { pattern: /\b(mosqu[eé]e?s?|masjid)\b/i, categories: ["mosque", "place_of_worship"] },
+  {
+    // Muslim prayer / mosque (Arabic + Latin). Do NOT map to generic place_of_worship.
+    pattern: /مسجد|جامع|مسل[م]|أصل[يى]|اصلي|صل[اا]ة|\b(mosqu\w*|masjid|muslim|pray(?:er|ing)?)\b/i,
+    categories: ["muslim_place_of_worship"],
+  },
   { pattern: /\b(restaurants?|rest+aurants?)\b/i, categories: ["restaurant"] },
 ];
 
@@ -51,7 +57,34 @@ const QUESTION_HINTS: { pattern: RegExp; categories: readonly string[] }[] = [
  */
 export function expandCategories(llmCategories: string[], question: string): string[] {
   const fromHints = QUESTION_HINTS.filter((h) => h.pattern.test(question)).flatMap((h) => h.categories);
-  return unique([...llmCategories, ...fromHints].flatMap((id) => EXPAND[id] ?? [id])).slice(0, 8);
+  const expanded = unique([...llmCategories, ...fromHints].flatMap((id) => EXPAND[id] ?? [id]));
+  return narrowWorship(expanded).slice(0, 8);
+}
+
+/**
+ * "place_of_worship" matches churches and mosques. When the intent is clearly Muslim
+ * (or clearly Christian), keep only the matching religion-specific ids.
+ */
+function narrowWorship(categories: string[]): string[] {
+  const muslim = categories.some((c) => c === "muslim_place_of_worship" || c === "mosque");
+  const christian = categories.some(
+    (c) => c === "christian_place_of_worship" || c === "roman_catholic_place_of_worship" || c === "church",
+  );
+
+  if (muslim && !christian) {
+    return unique([
+      ...categories.filter((c) => c !== "place_of_worship" && c !== "mosque" && c !== "church"),
+      "muslim_place_of_worship",
+    ]);
+  }
+  if (christian && !muslim) {
+    return unique([
+      ...categories.filter((c) => c !== "place_of_worship" && c !== "mosque" && c !== "church"),
+      "christian_place_of_worship",
+      "roman_catholic_place_of_worship",
+    ]);
+  }
+  return categories;
 }
 
 function unique(values: string[]): string[] {

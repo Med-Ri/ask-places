@@ -94,6 +94,22 @@ describe("askPlaces", () => {
     );
   });
 
+  it("searches muslim_place_of_worship for Arabic prayer questions, not churches", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({
+        ...intent,
+        what: "مسجد",
+        where: "",
+        countryCode: null,
+        categories: ["place_of_worship"],
+      })),
+    });
+    await askPlaces("أنا مسلم و أريد أن أصلي أين يمكنني الذهاب", { ...options, origin: { lat: 36.84, lng: 10.27 } }, d);
+    const cats = d.searchPlaces.mock.calls[0]![1].categories;
+    expect(cats).toContain("muslim_place_of_worship");
+    expect(cats).not.toContain("place_of_worship");
+  });
+
   it("returns [] when the place cannot be geocoded", async () => {
     const d = deps({ geocode: vi.fn(async () => null) });
     expect(await askPlaces("cafés in Nowhereville", options, d)).toEqual([]);
