@@ -20,6 +20,11 @@ export type AskPlacesOptions = {
   model?: string;
   /** Where travel times are measured from (e.g. the user's GPS position). Defaults to the location named in the question. */
   origin?: LatLng;
+  /**
+   * Max straight-line distance in meters from the search center (origin, or the place named in the question).
+   * Overrides any radius mentioned in the question. Example: 500 for "within 500m".
+   */
+  radiusMeters?: number;
 };
 
 export type PlaceStatus = {

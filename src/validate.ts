@@ -1,4 +1,5 @@
 import { AskPlacesUsageError } from "./errors.js";
+import { MAX_RADIUS_METERS, MIN_RADIUS_METERS } from "./llm/understand.js";
 import { normalizeQuestion } from "./normalize-question.js";
 import { SUPPORTED_PROVIDERS, type AskPlacesOptions, type LatLng, type Provider } from "./types.js";
 
@@ -54,12 +55,15 @@ function validateOptions(options: unknown): AskPlacesOptions {
   const apiKey = validateApiKey(options["apiKey"], provider);
   const model = options["model"] === undefined ? undefined : validateModel(options["model"]);
   const origin = options["origin"] === undefined ? undefined : validateOrigin(options["origin"]);
+  const radiusMeters =
+    options["radiusMeters"] === undefined ? undefined : validateRadiusMeters(options["radiusMeters"]);
 
   return {
     provider,
     apiKey,
     ...(model === undefined ? {} : { model }),
     ...(origin === undefined ? {} : { origin }),
+    ...(radiusMeters === undefined ? {} : { radiusMeters }),
   };
 }
 
@@ -116,6 +120,23 @@ function validateOrigin(origin: unknown): LatLng {
     );
   }
   return { lat, lng };
+}
+
+function validateRadiusMeters(radiusMeters: unknown): number {
+  if (typeof radiusMeters !== "number" || !Number.isFinite(radiusMeters)) {
+    throw new AskPlacesUsageError(
+      "INVALID_OPTIONS",
+      `askplaces: options.radiusMeters must be a number of meters, received ${describe(radiusMeters)}.`,
+    );
+  }
+  const meters = Math.round(radiusMeters);
+  if (meters < MIN_RADIUS_METERS || meters > MAX_RADIUS_METERS) {
+    throw new AskPlacesUsageError(
+      "INVALID_OPTIONS",
+      `askplaces: options.radiusMeters must be between ${MIN_RADIUS_METERS} and ${MAX_RADIUS_METERS}, received ${describe(radiusMeters)}.`,
+    );
+  }
+  return meters;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

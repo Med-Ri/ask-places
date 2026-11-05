@@ -7,6 +7,7 @@ import { understandQuestion, type UnderstoodQuestion } from "./llm/understand.js
 import { runQuery } from "./overture/duckdb.js";
 import { MAX_RESULTS, searchPlaces } from "./overture/places.js";
 import { getLatestRelease } from "./overture/release.js";
+import { parseRadiusFromQuestion } from "./parse-radius.js";
 import { addTravelTimes, travelOrigin } from "./routing/travel-times.js";
 import type { AskPlacesOptions, LatLng, Place } from "./types.js";
 import { validateInput } from "./validate.js";
@@ -53,8 +54,9 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
 
   const model = makeModel(options.provider, options.apiKey, options.model);
   const intent = await understand(question, model, options.provider);
+  const radiusMeters = resolveRadiusMeters(question, options, intent);
 
-  const searchCenter = await resolveSearchArea(intent, options.origin, doGeocode);
+  const searchCenter = await resolveSearchArea(intent, options.origin, radiusMeters, doGeocode);
   if (!searchCenter) return [];
 
   const release = await getRelease();
@@ -65,7 +67,7 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
     categories: intent.categories,
     limit,
   });
-  // BBox search is a square; when the user asked for a radius, keep only places inside the circle.
+  // BBox search is a square; when a radius applies, keep only places inside the circle.
   const inRadius =
     searchCenter.radiusMeters === null
       ? found
@@ -77,13 +79,21 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
   return doTransit(withTravel, model, options.provider);
 }
 
+/** options.radiusMeters > LLM > text parse (e.g. "within 500m"). */
+export function resolveRadiusMeters(
+  question: string,
+  options: Pick<AskPlacesOptions, "radiusMeters">,
+  intent: Pick<UnderstoodQuestion, "radiusMeters">,
+): number | null {
+  return options.radiusMeters ?? intent.radiusMeters ?? parseRadiusFromQuestion(question);
+}
+
 async function resolveSearchArea(
   intent: UnderstoodQuestion,
   origin: LatLng | undefined,
+  radiusMeters: number | null,
   doGeocode: typeof geocode,
 ): Promise<{ center: LatLng; area: ReturnType<typeof bboxAround>; radiusMeters: number | null } | null> {
-  const radiusMeters = intent.radiusMeters;
-
   if (intent.where !== "") {
     const located = await doGeocode({ place: intent.where, countryCode: intent.countryCode ?? undefined });
     if (!located) return null;

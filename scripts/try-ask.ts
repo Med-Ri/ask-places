@@ -2,9 +2,10 @@
  * End-to-end check against real services. Needs a real LLM key in the environment.
  *
  *   GROQ_API_KEY=gsk-… npm run try:ask -- --provider groq "cafés near Lac 2, Tunis"
- *   GROQ_API_KEY=gsk-… npm run try:ask -- --provider groq --origin 36.8455,10.2709 "cafés near me"
+ *   GROQ_API_KEY=gsk-… npm run try:ask -- --provider groq --origin 36.8455,10.2709 --radius 500 "restaurants near me"
  */
 import { askPlaces, type AskPlacesDeps } from "../src/ask-places.js";
+import { distanceMeters } from "../src/geo.js";
 import { geocode } from "../src/geocode/geocode.js";
 import { addTransitEstimates } from "../src/llm/transit.js";
 import { createModel, DEFAULT_MODELS } from "../src/llm/models.js";
@@ -19,6 +20,7 @@ const args = process.argv.slice(2);
 let provider: Provider = "openai";
 let model: string | undefined;
 let origin: LatLng | undefined;
+let radiusMeters: number | undefined;
 const questionParts: string[] = [];
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--provider" && args[i + 1]) {
@@ -27,6 +29,8 @@ for (let i = 0; i < args.length; i++) {
     model = args[++i];
   } else if (args[i] === "--origin" && args[i + 1]) {
     origin = parseOrigin(args[++i]!);
+  } else if (args[i] === "--radius" && args[i + 1]) {
+    radiusMeters = parseRadius(args[++i]!);
   } else if (args[i]) {
     questionParts.push(args[i]!);
   }
@@ -34,7 +38,7 @@ for (let i = 0; i < args.length; i++) {
 const question = questionParts.join(" ").trim();
 if (!question) {
   console.error(
-    'Usage: npm run try:ask -- [--provider groq] [--model …] [--origin 36.8455,10.2709] "cafés near me"',
+    'Usage: npm run try:ask -- [--provider groq] [--model …] [--origin 36.8455,10.2709] [--radius 500] "restaurants near me"',
   );
   process.exit(1);
 }
@@ -54,7 +58,11 @@ if (!apiKey) {
 }
 
 const chosenModel = model ?? DEFAULT_MODELS[provider];
-console.log(`provider=${provider} model=${chosenModel}${origin ? ` origin=${origin.lat},${origin.lng}` : ""}`);
+console.log(
+  `provider=${provider} model=${chosenModel}` +
+    `${origin ? ` origin=${origin.lat},${origin.lng}` : ""}` +
+    `${radiusMeters !== undefined ? ` radius=${radiusMeters}m` : ""}`,
+);
 
 async function timed<T>(label: string, task: () => Promise<T>): Promise<T> {
   const start = performance.now();
@@ -89,6 +97,7 @@ try {
       apiKey,
       ...(model ? { model } : {}),
       ...(origin ? { origin } : {}),
+      ...(radiusMeters !== undefined ? { radiusMeters } : {}),
     },
     deps,
   );
@@ -96,9 +105,12 @@ try {
   for (const p of places) {
     const t = p.travelTime;
     const mins = (v: number | null) => (v === null ? "-" : `${v} min`);
+    const dist = origin ? `${Math.round(distanceMeters(origin, p.location))} m` : null;
     console.log(`- ${p.name} | ${p.description ?? "-"} | ${p.phoneNumber ?? "-"}`);
     console.log(`    ${p.address ?? "(no address)"}`);
-    console.log(`    ${p.location.lat.toFixed(6)}, ${p.location.lng.toFixed(6)}`);
+    console.log(
+      `    ${p.location.lat.toFixed(6)}, ${p.location.lng.toFixed(6)}${dist ? ` | ${dist} straight-line` : ""}`,
+    );
     console.log(
       `    walk ${mins(t.walking)}, car ${mins(t.driving)}, bike ${mins(t.cycling)}, transit ${t.transit ? `${t.transit.minutes} min (est.)` : "-"}`,
     );
@@ -120,4 +132,13 @@ function parseOrigin(value: string): LatLng {
     process.exit(1);
   }
   return { lat, lng };
+}
+
+function parseRadius(value: string): number {
+  const meters = Number(value);
+  if (!Number.isFinite(meters) || meters < 50 || meters > 25_000) {
+    console.error(`Invalid --radius "${value}". Expected meters between 50 and 25000`);
+    process.exit(1);
+  }
+  return Math.round(meters);
 }

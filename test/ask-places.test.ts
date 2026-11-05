@@ -121,6 +121,26 @@ describe("askPlaces", () => {
     expect(d.addTravelTimes).toHaveBeenCalledWith([near], origin);
   });
 
+  it("parses radius from the question when the LLM omits it", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: null })),
+    });
+    const origin = { lat: 36.84, lng: 10.27 };
+    await askPlaces("restaurants within 500m", { ...options, origin }, d);
+    const searchArg = d.searchPlaces.mock.calls[0]![1];
+    expect(searchArg.area.north - origin.lat).toBeCloseTo(500 / 111_320, 5);
+  });
+
+  it("lets options.radiusMeters override the question", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: 2_000 })),
+    });
+    const origin = { lat: 36.84, lng: 10.27 };
+    await askPlaces("restaurants within 2km", { ...options, origin, radiusMeters: 300 }, d);
+    const searchArg = d.searchPlaces.mock.calls[0]![1];
+    expect(searchArg.area.north - origin.lat).toBeCloseTo(300 / 111_320, 5);
+  });
+
   it("applies radius around a geocoded place when the question asks for one", async () => {
     const d = deps({
       understand: vi.fn(async () => ({ ...intent, radiusMeters: 500 })),

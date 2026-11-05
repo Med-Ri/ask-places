@@ -28,6 +28,15 @@ describe("validateInput: valid input", () => {
     expect(result.options.origin).toEqual({ lat: 36.84, lng: 10.27 });
   });
 
+  it("keeps a valid radiusMeters", () => {
+    const result = validateInput("cafés", { ...validOptions, radiusMeters: 500 });
+    expect(result.options.radiusMeters).toBe(500);
+  });
+
+  it.each([49, 25_001, "500", NaN])("rejects invalid radiusMeters %j", (radiusMeters) => {
+    expect(errorFrom("cafés", { ...validOptions, radiusMeters }).code).toBe("INVALID_OPTIONS");
+  });
+
   it("accepts origin values on the limits", () => {
     expect(() => validateInput("cafés", { ...validOptions, origin: { lat: -90, lng: 180 } })).not.toThrow();
   });

@@ -40,7 +40,7 @@ Rules:
 - "what": the kind of place in the user's language, or "" if none is named.
 - "where": the location to search (city, neighbourhood, landmark, address). Use "" when the user only means "near me" / their current position / a radius around themselves. Do not put "radius", distance words, or "near me" into "where".
 - "countryCode": ISO 3166-1 alpha-2 uppercase when you can infer it from "where", otherwise null. Never invent a country.
-- "categories": 1 to 5 Overture Places category ids that match "what". Prefer specific ids (cafe, coffee_shop) and add a broader parent when useful (food_and_drink). Use [] when the question has no place type.
+- "categories": 1 to 5 Overture Places category ids that match "what". Match the user's specificity: "restaurant(s)" -> restaurant / *_restaurant (not cafe, coffee_shop, tea_room, bakery); "café(s)" -> cafe, coffee_shop. Add a broader parent only when useful. Use [] when the question has no place type.
 - Prefer ids from this list when they fit: ${COMMON_CATEGORIES.join(", ")}.
 - "limit": a positive integer when the user asks for a number of places (e.g. "3 pharmacies" -> 3), otherwise null. Cap at ${MAX_RESULTS}.
 - "radiusMeters": distance in meters when the user asks for a radius / "within X" / "in a radius of X" (accept misspellings like "raduis"). Convert km to meters (0.5 km -> 500). Convert miles to meters (1 mile -> 1609). Otherwise null. Cap at ${MAX_RADIUS_METERS}.
