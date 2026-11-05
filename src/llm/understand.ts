@@ -5,6 +5,10 @@ import { COMMON_CATEGORIES } from "./categories.js";
 import { usageErrorFromLlm } from "./errors.js";
 import { llmAbortSignal } from "./timeout.js";
 
+/** Smallest / largest search radius we accept from the question (meters). */
+export const MIN_RADIUS_METERS = 50;
+export const MAX_RADIUS_METERS = 25_000;
+
 export type UnderstoodQuestion = {
   /** What to look for, e.g. "cafés". Empty when the question has no place type. */
   what: string;
@@ -16,6 +20,8 @@ export type UnderstoodQuestion = {
   categories: string[];
   /** Max places to return when the user asked for a number, otherwise null. */
   limit: number | null;
+  /** Search radius in meters when the user asked for one (e.g. "within 500m"), otherwise null. */
+  radiusMeters: number | null;
 };
 
 const schema = z.object({
@@ -24,6 +30,7 @@ const schema = z.object({
   countryCode: z.string().nullable(),
   categories: z.array(z.string()),
   limit: z.number().int().nullable(),
+  radiusMeters: z.number().nullable(),
 });
 
 const SYSTEM = `You extract a place search from a user's question.
@@ -31,11 +38,12 @@ Return JSON that matches the schema.
 
 Rules:
 - "what": the kind of place in the user's language, or "" if none is named.
-- "where": the location to search (city, neighbourhood, landmark, address). Use "" when the user only means "near me" / their current position.
+- "where": the location to search (city, neighbourhood, landmark, address). Use "" when the user only means "near me" / their current position / a radius around themselves. Do not put "radius", distance words, or "near me" into "where".
 - "countryCode": ISO 3166-1 alpha-2 uppercase when you can infer it from "where", otherwise null. Never invent a country.
 - "categories": 1 to 5 Overture Places category ids that match "what". Prefer specific ids (cafe, coffee_shop) and add a broader parent when useful (food_and_drink). Use [] when the question has no place type.
 - Prefer ids from this list when they fit: ${COMMON_CATEGORIES.join(", ")}.
 - "limit": a positive integer when the user asks for a number of places (e.g. "3 pharmacies" -> 3), otherwise null. Cap at ${MAX_RESULTS}.
+- "radiusMeters": distance in meters when the user asks for a radius / "within X" / "in a radius of X" (accept misspellings like "raduis"). Convert km to meters (0.5 km -> 500). Convert miles to meters (1 mile -> 1609). Otherwise null. Cap at ${MAX_RADIUS_METERS}.
 - Do not invent places. Only interpret the question.`;
 
 /**
@@ -68,7 +76,16 @@ function normalize(raw: z.infer<typeof schema>): UnderstoodQuestion {
     countryCode: country && /^[A-Z]{2}$/.test(country) ? country : null,
     categories: uniqueSnakeCase(raw.categories).slice(0, 5),
     limit: raw.limit === null ? null : Math.min(Math.max(Math.trunc(raw.limit), 1), MAX_RESULTS),
+    radiusMeters: normalizeRadius(raw.radiusMeters),
   };
+}
+
+function normalizeRadius(value: number | null): number | null {
+  if (value === null || !Number.isFinite(value)) return null;
+  const meters = Math.round(value);
+  if (meters < MIN_RADIUS_METERS) return MIN_RADIUS_METERS;
+  if (meters > MAX_RADIUS_METERS) return MAX_RADIUS_METERS;
+  return meters;
 }
 
 /** Keeps only plausible Overture ids (letters, digits, underscores) and drops duplicates. */

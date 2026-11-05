@@ -48,3 +48,14 @@ export function shrinkToAtMost(bbox: BBox, center: LatLng, radiusMeters: number)
 export function bboxCenter(bbox: BBox): LatLng {
   return { lat: (bbox.south + bbox.north) / 2, lng: (bbox.west + bbox.east) / 2 };
 }
+
+/** Straight-line distance in meters (haversine). Good enough to enforce a search radius. */
+export function distanceMeters(a: LatLng, b: LatLng): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}

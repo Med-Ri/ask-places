@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bboxAround, bboxCenter, expandToAtLeast, shrinkToAtMost } from "../src/geo.js";
+import { bboxAround, bboxCenter, distanceMeters, expandToAtLeast, shrinkToAtMost } from "../src/geo.js";
 
 const tunis = { lat: 36.8, lng: 10.18 };
 
@@ -34,5 +34,17 @@ describe("expandToAtLeast / shrinkToAtMost", () => {
   it("cuts a country-sized box down to the maximum radius", () => {
     const country = { west: 7.5, south: 30.2, east: 11.6, north: 37.5 };
     expect(shrinkToAtMost(country, tunis, 25_000)).toEqual(bboxAround(tunis, 25_000));
+  });
+});
+
+describe("distanceMeters", () => {
+  it("is ~0 for the same point", () => {
+    expect(distanceMeters(tunis, tunis)).toBe(0);
+  });
+
+  it("is about 1 km for a 0.009° north shift near Tunis", () => {
+    const north = { lat: tunis.lat + 0.009, lng: tunis.lng };
+    expect(distanceMeters(tunis, north)).toBeGreaterThan(900);
+    expect(distanceMeters(tunis, north)).toBeLessThan(1_100);
   });
 });

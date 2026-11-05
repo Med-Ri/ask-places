@@ -1,5 +1,5 @@
 import { AskPlacesInternalError } from "./errors.js";
-import { bboxAround } from "./geo.js";
+import { bboxAround, distanceMeters } from "./geo.js";
 import { geocode } from "./geocode/geocode.js";
 import { addTransitEstimates } from "./llm/transit.js";
 import { createModel } from "./llm/models.js";
@@ -65,10 +65,15 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
     categories: intent.categories,
     limit,
   });
-  if (found.length === 0) return [];
+  // BBox search is a square; when the user asked for a radius, keep only places inside the circle.
+  const inRadius =
+    searchCenter.radiusMeters === null
+      ? found
+      : found.filter((place) => distanceMeters(searchCenter.center, place.location) <= searchCenter.radiusMeters!);
+  if (inRadius.length === 0) return [];
 
   const origin = travelOrigin(options.origin, searchCenter.center);
-  const withTravel = await doTravel(found, origin);
+  const withTravel = await doTravel(inRadius, origin);
   return doTransit(withTravel, model, options.provider);
 }
 
@@ -76,15 +81,22 @@ async function resolveSearchArea(
   intent: UnderstoodQuestion,
   origin: LatLng | undefined,
   doGeocode: typeof geocode,
-): Promise<{ center: LatLng; area: ReturnType<typeof bboxAround> } | null> {
+): Promise<{ center: LatLng; area: ReturnType<typeof bboxAround>; radiusMeters: number | null } | null> {
+  const radiusMeters = intent.radiusMeters;
+
   if (intent.where !== "") {
     const located = await doGeocode({ place: intent.where, countryCode: intent.countryCode ?? undefined });
     if (!located) return null;
-    return { center: located.center, area: located.area };
+    if (radiusMeters !== null) {
+      return { center: located.center, area: bboxAround(located.center, radiusMeters), radiusMeters };
+    }
+    return { center: located.center, area: located.area, radiusMeters: null };
   }
-  // "cafés near me" with GPS: search around the developer's origin.
+
+  // "cafés near me" / "within 500m" with GPS: search around the developer's origin.
   if (origin) {
-    return { center: origin, area: bboxAround(origin, ORIGIN_SEARCH_RADIUS_METERS) };
+    const meters = radiusMeters ?? ORIGIN_SEARCH_RADIUS_METERS;
+    return { center: origin, area: bboxAround(origin, meters), radiusMeters: meters };
   }
   return null;
 }

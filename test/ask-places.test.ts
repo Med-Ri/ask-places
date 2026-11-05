@@ -13,6 +13,7 @@ const intent: UnderstoodQuestion = {
   countryCode: "TN",
   categories: ["cafe", "coffee_shop"],
   limit: null,
+  radiusMeters: null,
 };
 
 const cafe: Place = {
@@ -101,6 +102,32 @@ describe("askPlaces", () => {
     const searchArg = d.searchPlaces.mock.calls[0]![1];
     expect(searchArg.area.west).toBeLessThan(origin.lng);
     expect(searchArg.area.east).toBeGreaterThan(origin.lng);
+  });
+
+  it("uses the asked radius around origin and drops places outside it", async () => {
+    const near: Place = { ...cafe, name: "Near", location: { lat: 36.8405, lng: 10.27 } };
+    const far: Place = { ...cafe, name: "Far", location: { lat: 36.85, lng: 10.28 } };
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: 500 })),
+      searchPlaces: vi.fn(async () => [near, far]),
+    });
+    const origin = { lat: 36.84, lng: 10.27 };
+    const places = await askPlaces("restaurants within 500m", { ...options, origin }, d);
+
+    const searchArg = d.searchPlaces.mock.calls[0]![1];
+    // ~500 m in latitude degrees ≈ 0.0045
+    expect(searchArg.area.north - origin.lat).toBeCloseTo(500 / 111_320, 5);
+    expect(places.map((p) => p.name)).toEqual(["Near"]);
+    expect(d.addTravelTimes).toHaveBeenCalledWith([near], origin);
+  });
+
+  it("applies radius around a geocoded place when the question asks for one", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, radiusMeters: 500 })),
+    });
+    await askPlaces("cafés within 500m of Lac 2, Tunis", options, d);
+    const searchArg = d.searchPlaces.mock.calls[0]![1];
+    expect(searchArg.area.north - located.center.lat).toBeCloseTo(500 / 111_320, 5);
   });
 
   it("returns [] when there is no where and no origin", async () => {

@@ -1,8 +1,8 @@
 /**
  * End-to-end check against real services. Needs a real LLM key in the environment.
  *
- *   OPENAI_API_KEY=sk-… npm run try:ask -- "cafés near Lac 2, Tunis"
- *   GOOGLE_GENERATIVE_AI_API_KEY=… npm run try:ask -- --provider google "cafés near Lac 2, Tunis"
+ *   GROQ_API_KEY=gsk-… npm run try:ask -- --provider groq "cafés near Lac 2, Tunis"
+ *   GROQ_API_KEY=gsk-… npm run try:ask -- --provider groq --origin 36.8455,10.2709 "cafés near me"
  */
 import { askPlaces, type AskPlacesDeps } from "../src/ask-places.js";
 import { geocode } from "../src/geocode/geocode.js";
@@ -13,24 +13,29 @@ import { runQuery } from "../src/overture/duckdb.js";
 import { searchPlaces } from "../src/overture/places.js";
 import { getLatestRelease } from "../src/overture/release.js";
 import { addTravelTimes } from "../src/routing/travel-times.js";
-import type { Provider } from "../src/types.js";
+import type { LatLng, Provider } from "../src/types.js";
 
 const args = process.argv.slice(2);
 let provider: Provider = "openai";
 let model: string | undefined;
+let origin: LatLng | undefined;
 const questionParts: string[] = [];
 for (let i = 0; i < args.length; i++) {
   if (args[i] === "--provider" && args[i + 1]) {
     provider = args[++i] as Provider;
   } else if (args[i] === "--model" && args[i + 1]) {
     model = args[++i];
+  } else if (args[i] === "--origin" && args[i + 1]) {
+    origin = parseOrigin(args[++i]!);
   } else if (args[i]) {
     questionParts.push(args[i]!);
   }
 }
 const question = questionParts.join(" ").trim();
 if (!question) {
-  console.error('Usage: npm run try:ask -- [--provider google] [--model gemini-3.8-flash] "cafés near Lac 2, Tunis"');
+  console.error(
+    'Usage: npm run try:ask -- [--provider groq] [--model …] [--origin 36.8455,10.2709] "cafés near me"',
+  );
   process.exit(1);
 }
 
@@ -49,7 +54,7 @@ if (!apiKey) {
 }
 
 const chosenModel = model ?? DEFAULT_MODELS[provider];
-console.log(`provider=${provider} model=${chosenModel}`);
+console.log(`provider=${provider} model=${chosenModel}${origin ? ` origin=${origin.lat},${origin.lng}` : ""}`);
 
 async function timed<T>(label: string, task: () => Promise<T>): Promise<T> {
   const start = performance.now();
@@ -71,18 +76,29 @@ const deps: AskPlacesDeps = {
   getRelease: () => timed("Overture release", () => getLatestRelease()),
   searchPlaces: (run, search) => timed("Overture place search", () => searchPlaces(run, search)),
   runQuery,
-  addTravelTimes: (places, origin) => timed("travel times (Valhalla)", () => addTravelTimes(places, origin)),
+  addTravelTimes: (places, from) => timed("travel times (Valhalla)", () => addTravelTimes(places, from)),
   addTransitEstimates: (places, m, p) => timed("LLM transit estimate", () => addTransitEstimates(places, m, p)),
 };
 
 const start = performance.now();
 try {
-  const places = await askPlaces(question, { provider, apiKey, ...(model ? { model } : {}) }, deps);
+  const places = await askPlaces(
+    question,
+    {
+      provider,
+      apiKey,
+      ...(model ? { model } : {}),
+      ...(origin ? { origin } : {}),
+    },
+    deps,
+  );
   console.log(`\n${places.length} places in ${Math.round(performance.now() - start)} ms\n`);
   for (const p of places) {
     const t = p.travelTime;
     const mins = (v: number | null) => (v === null ? "-" : `${v} min`);
     console.log(`- ${p.name} | ${p.description ?? "-"} | ${p.phoneNumber ?? "-"}`);
+    console.log(`    ${p.address ?? "(no address)"}`);
+    console.log(`    ${p.location.lat.toFixed(6)}, ${p.location.lng.toFixed(6)}`);
     console.log(
       `    walk ${mins(t.walking)}, car ${mins(t.driving)}, bike ${mins(t.cycling)}, transit ${t.transit ? `${t.transit.minutes} min (est.)` : "-"}`,
     );
@@ -92,4 +108,16 @@ try {
   console.error(`\n${err.name ?? "Error"} (${err.code ?? "?"}): ${err.message}`);
   if (err.cause instanceof Error) console.error(`cause: ${err.cause.name}: ${err.cause.message}`);
   process.exit(1);
+}
+
+/** Parses "lat,lng" (e.g. "36.8455,10.2709"). */
+function parseOrigin(value: string): LatLng {
+  const [latRaw, lngRaw] = value.split(",");
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    console.error(`Invalid --origin "${value}". Expected lat,lng e.g. 36.8455,10.2709`);
+    process.exit(1);
+  }
+  return { lat, lng };
 }
