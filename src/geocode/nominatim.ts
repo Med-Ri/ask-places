@@ -1,10 +1,8 @@
 import { createThrottle, type Schedule } from "../throttle.js";
+import { USER_AGENT } from "../user-agent.js";
 import type { GeocodeQuery, GeocodeResult } from "./types.js";
 
 export const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
-
-/** Nominatim's usage policy requires an identifying User-Agent. */
-export const USER_AGENT = "askplaces (https://www.npmjs.com/package/askplaces)";
 
 /** Nominatim's usage policy: at most 1 request per second for the whole application. */
 const nominatimThrottle = createThrottle(1_000);

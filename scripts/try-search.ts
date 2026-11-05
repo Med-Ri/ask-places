@@ -8,6 +8,7 @@ import { geocode } from "../src/geocode/geocode.js";
 import { runQuery } from "../src/overture/duckdb.js";
 import { searchPlaces } from "../src/overture/places.js";
 import { getLatestRelease } from "../src/overture/release.js";
+import { addTravelTimes, travelOrigin } from "../src/routing/travel-times.js";
 
 const [place, ...categories] = process.argv.slice(2);
 if (!place) {
@@ -33,10 +34,16 @@ if (!location) {
 console.log(`  ${location.name} (${location.source})`, location.center);
 
 const search = { release, area: location.area, categories };
-const places = await time("search (cold)", () => searchPlaces(runQuery, search));
+const found = await time("search (cold)", () => searchPlaces(runQuery, search));
 await time("search (warm, same query)", () => searchPlaces(runQuery, search));
 
-console.log(`\n${places.length} places:`);
+const origin = travelOrigin(undefined, location.center);
+const places = await time("travel times", () => addTravelTimes(found, origin));
+
+const minutes = (value: number | null) => (value === null ? "-" : `${value} min`);
+console.log(`\n${places.length} places (travel times from ${location.name}):`);
 for (const p of places) {
-  console.log(`- ${p.name} | ${p.description ?? "-"} | ${p.phoneNumber ?? "-"} | ${p.website ?? "-"} | ${p.address ?? "-"}`);
+  const t = p.travelTime;
+  console.log(`- ${p.name} | ${p.description ?? "-"} | ${p.phoneNumber ?? "-"} | ${p.address ?? "-"}`);
+  console.log(`    walk ${minutes(t.walking)}, car ${minutes(t.driving)}, bike ${minutes(t.cycling)}`);
 }

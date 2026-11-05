@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { geocodeWithNominatim, USER_AGENT } from "../src/geocode/nominatim.js";
+import { geocodeWithNominatim } from "../src/geocode/nominatim.js";
+import { USER_AGENT } from "../src/user-agent.js";
 import { fakeFetch, immediately } from "./helpers.js";
 
 const lac2 = {
