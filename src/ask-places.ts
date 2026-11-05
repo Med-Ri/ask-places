@@ -2,6 +2,7 @@ import { AskPlacesInternalError } from "./errors.js";
 import { bboxAround, distanceMeters } from "./geo.js";
 import { geocode } from "./geocode/geocode.js";
 import { expandCategories } from "./llm/expand-categories.js";
+import { filterPlacesToIntent } from "./llm/match-intent.js";
 import { addTransitEstimates } from "./llm/transit.js";
 import { createModel } from "./llm/models.js";
 import { understandQuestion, type UnderstoodQuestion } from "./llm/understand.js";
@@ -74,7 +75,7 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
   });
 
   const origin = travelOrigin(options.origin, searchCenter.center);
-  const nearby = found
+  const nearby = filterPlacesToIntent(found, categories)
     .filter((place) => distanceMeters(searchCenter.center, place.location) <= searchCenter.radiusMeters)
     .sort((a, b) => distanceMeters(origin, a.location) - distanceMeters(origin, b.location));
   if (nearby.length === 0) return [];

@@ -107,6 +107,7 @@ describe("askPlaces", () => {
     await askPlaces("أنا مسلم و أريد أن أصلي أين يمكنني الذهاب", { ...options, origin: { lat: 36.84, lng: 10.27 } }, d);
     const cats = d.searchPlaces.mock.calls[0]![1].categories;
     expect(cats).toContain("muslim_place_of_worship");
+    expect(cats).toContain("religious_organization");
     expect(cats).not.toContain("place_of_worship");
   });
 

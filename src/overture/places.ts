@@ -6,8 +6,11 @@ import { releasePath } from "./release.js";
 
 export const MAX_RESULTS = 20;
 
-/** Overture's own score of how sure it is that a place exists. Below this, many places are stale. */
-export const MIN_CONFIDENCE = 0.5;
+/**
+ * Overture's own score of how sure it is that a place exists.
+ * 0.35 keeps real POIs that Meta under-scores (common in Tunisia) while still dropping obvious junk.
+ */
+export const MIN_CONFIDENCE = 0.35;
 
 export type PlaceSearch = {
   release: string;

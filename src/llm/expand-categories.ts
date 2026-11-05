@@ -18,9 +18,9 @@ const EXPAND: Record<string, readonly string[]> = {
   doctor: ["doctors_office", "clinic", "medical_center"],
   doctors_office: ["doctors_office", "clinic", "medical_center"],
   clinic: ["clinic", "doctors_office", "medical_center"],
-  // Overture has no plain "mosque" / "church" leaf that matches; use religion-specific ids.
-  mosque: ["muslim_place_of_worship"],
-  muslim_place_of_worship: ["muslim_place_of_worship"],
+  // Overture uses muslim_place_of_worship; some mosques are only tagged religious_organization.
+  mosque: ["muslim_place_of_worship", "religious_organization"],
+  muslim_place_of_worship: ["muslim_place_of_worship", "religious_organization"],
   church: ["christian_place_of_worship", "roman_catholic_place_of_worship"],
   christian_place_of_worship: ["christian_place_of_worship", "roman_catholic_place_of_worship"],
   store: ["shopping", "supermarket", "convenience_store", "department_store"],
@@ -75,6 +75,7 @@ function narrowWorship(categories: string[]): string[] {
     return unique([
       ...categories.filter((c) => c !== "place_of_worship" && c !== "mosque" && c !== "church"),
       "muslim_place_of_worship",
+      "religious_organization",
     ]);
   }
   if (christian && !muslim) {
