@@ -44,7 +44,7 @@ export async function addTransitEstimates(
     const { output } = await generateText({
       model,
       temperature: 0,
-      maxRetries: 1,
+      maxRetries: 3,
       abortSignal: llmAbortSignal(),
       system: SYSTEM,
       prompt: `Estimate public-transit minutes for each place:\n${prompt}`,

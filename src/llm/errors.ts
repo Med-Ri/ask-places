@@ -18,6 +18,7 @@ export function isInvalidApiKeyError(error: unknown): boolean {
 }
 
 const QUOTA_HINT = /credit|billing|quota|insufficient|payment|balance|plan|exceeded|rate.?limit/i;
+const BUSY_HINT = /high demand|overloaded|unavailable|try again later|temporarily|capacity|resource.?exhausted|spike/i;
 const MODEL_GONE_HINT = /model|no longer available|not found|not supported|unknown model/i;
 
 function errorText(error: unknown): string {
@@ -30,7 +31,17 @@ export function isProviderQuotaError(error: unknown): boolean {
   const inner = unwrapLlmError(error);
   if (!APICallError.isInstance(inner)) return false;
   if (inner.statusCode === 402) return true;
+  // Plain 429 without a billing hint is treated as temporary busy below.
   return (inner.statusCode === 429 || inner.statusCode === 403) && QUOTA_HINT.test(errorText(inner));
+}
+
+/** Provider is temporarily overloaded (e.g. Google "high demand"). Retrying later usually works. */
+export function isProviderBusyError(error: unknown): boolean {
+  const inner = unwrapLlmError(error);
+  if (!APICallError.isInstance(inner)) return false;
+  if (inner.statusCode === 503 || inner.statusCode === 529) return true;
+  if (inner.statusCode === 429 && !QUOTA_HINT.test(errorText(inner))) return true;
+  return BUSY_HINT.test(errorText(inner));
 }
 
 /** Provider says the model id is unknown or retired (e.g. Google 404 for gemini-2.5-flash). */
@@ -60,6 +71,13 @@ export function usageErrorFromLlm(error: unknown, provider: string): AskPlacesUs
     return new AskPlacesUsageError(
       "PROVIDER_QUOTA",
       `askplaces: the "${provider}" account has no credits left, hit a rate limit, or needs billing enabled. Add credits in the provider's dashboard, or switch provider / model.`,
+    );
+  }
+
+  if (isProviderBusyError(error)) {
+    return new AskPlacesUsageError(
+      "PROVIDER_BUSY",
+      `askplaces: the "${provider}" model is temporarily overloaded (high demand). Wait a moment and try again, or pass options.model / another provider.`,
     );
   }
 

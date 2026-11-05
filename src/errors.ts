@@ -6,6 +6,7 @@ export type UsageErrorCode =
   | "MISSING_API_KEY"
   | "INVALID_API_KEY"
   | "PROVIDER_QUOTA"
+  | "PROVIDER_BUSY"
   | "PROVIDER_TIMEOUT"
   | "INVALID_ORIGIN";
 

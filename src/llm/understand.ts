@@ -47,7 +47,7 @@ export async function understandQuestion(question: string, model: LanguageModel,
     const { output } = await generateText({
       model,
       temperature: 0,
-      maxRetries: 1,
+      maxRetries: 3,
       abortSignal: llmAbortSignal(),
       system: SYSTEM,
       prompt: question,

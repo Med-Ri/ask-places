@@ -2,6 +2,7 @@ import { APICallError, NoSuchModelError, RetryError } from "ai";
 import { describe, expect, it } from "vitest";
 import {
   isInvalidApiKeyError,
+  isProviderBusyError,
   isProviderQuotaError,
   isUnknownModelError,
   unwrapLlmError,
@@ -76,6 +77,16 @@ describe("usageErrorFromLlm", () => {
     const error = usageErrorFromLlm(new NoSuchModelError({ modelId: "nope", modelType: "languageModel" }), "anthropic");
     expect(error?.code).toBe("INVALID_OPTIONS");
     expect(error?.message).toContain('"anthropic"');
+  });
+
+  it("maps Google high-demand RetryError to PROVIDER_BUSY", () => {
+    const last = apiError(503, "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.");
+    const wrapped = new RetryError({ message: "Failed after 2 attempts", reason: "maxRetriesExceeded", errors: [last] });
+    expect(isProviderBusyError(wrapped)).toBe(true);
+    const error = usageErrorFromLlm(wrapped, "google");
+    expect(error?.code).toBe("PROVIDER_BUSY");
+    expect(error?.message).toContain("overloaded");
+    expect(error?.message).toContain('"google"');
   });
 
   it("maps a retired Google model 404 to INVALID_OPTIONS", () => {
