@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { clearSearchCaches } from "../src/cache.js";
 import { buildQuery, searchOsmPlaces, toPlace } from "../src/osm/overpass.js";
 import { toLeg } from "../src/osm/valhalla.js";
 import { geocodePlace } from "../src/osm/nominatim.js";
@@ -6,6 +7,10 @@ import { geocodePlace } from "../src/osm/nominatim.js";
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
+
+beforeEach(() => {
+  clearSearchCaches();
+});
 
 describe("nominatim", () => {
   it("returns the first hit", async () => {

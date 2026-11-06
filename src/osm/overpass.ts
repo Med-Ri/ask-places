@@ -1,3 +1,4 @@
+import { placeSearchCache } from "../cache.js";
 import { distanceMeters } from "../geo.js";
 import { MAX_RESULTS } from "../limits.js";
 import type { LatLng, Place } from "../types.js";
@@ -72,8 +73,15 @@ export async function searchOsmPlaces(search: OsmPlaceSearch, deps: OverpassDeps
   const fetchFn = deps.fetch ?? fetch;
   const limit = Math.min(Math.max(Math.trunc(search.limit), 1), MAX_RESULTS);
   const radius = Math.min(Math.max(Math.round(search.radiusMeters), 1), 25_000);
+  const cacheKey = placeSearchKey(search, radius, limit);
+  const cached = placeSearchCache.get(cacheKey);
+  if (cached !== undefined) return structuredClone(cached);
+
   const query = buildQuery(search, radius);
-  if (!query) return [];
+  if (!query) {
+    placeSearchCache.set(cacheKey, []);
+    return [];
+  }
 
   const json = await fetchOverpass(query, fetchFn);
   const elements = Array.isArray(json.elements) ? json.elements : [];
@@ -84,7 +92,7 @@ export async function searchOsmPlaces(search: OsmPlaceSearch, deps: OverpassDeps
   });
 
   const seen = new Set<string>();
-  return places
+  const result = places
     .sort((a, b) => distanceMeters(search.center, a.location) - distanceMeters(search.center, b.location))
     .filter((place) => {
       const key = `${place.name}|${place.location.lat.toFixed(5)}|${place.location.lng.toFixed(5)}`;
@@ -93,6 +101,15 @@ export async function searchOsmPlaces(search: OsmPlaceSearch, deps: OverpassDeps
       return true;
     })
     .slice(0, limit);
+  placeSearchCache.set(cacheKey, result);
+  return structuredClone(result);
+}
+
+function placeSearchKey(search: OsmPlaceSearch, radius: number, limit: number): string {
+  const types = [...search.includedTypes].map((type) => type.trim().toLowerCase()).sort().join(",");
+  const lat = search.center.lat.toFixed(5);
+  const lng = search.center.lng.toFixed(5);
+  return `${lat},${lng}|${radius}|${limit}|${types}|${search.textQuery.trim().toLowerCase()}`;
 }
 
 export function buildQuery(search: OsmPlaceSearch, radius: number): string | null {

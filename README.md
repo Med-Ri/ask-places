@@ -28,6 +28,7 @@ const result = await askPlaces("أنا مسلم و أريد أن أصلي", {
 - `rating` is `null`. `status` is `"unknown"`. `description` is a short category label ("Mosque").
 - `distanceMeters` is straight-line. `streetDistance` and `travelTime` are the road route.
 - `travelTime.transit` is `null`.
+- The same geocode or place search is reused for 10 minutes, so a repeated question does not call OpenStreetMap again.
 - Show OpenStreetMap attribution with the results.
 
 ## Development
