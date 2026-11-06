@@ -3,7 +3,7 @@ node_modules/
 dist/
 coverage/
 
-# Secrets (LLM API keys used while developing)
+# Secrets. .env.example is the only env file that is committed.
 .env
 .env.*
 !.env.example

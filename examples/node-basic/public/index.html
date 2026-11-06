@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>askplaces</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="mark">askplaces</p>
+        <h1>Find a place nearby</h1>
+        <p class="lead">Ask in any language. The search uses your current location. The key stays on the server.</p>
+      </header>
+
+      <form id="search">
+        <label for="question">Question</label>
+        <textarea id="question" name="question" rows="3" required placeholder="pharmacy"></textarea>
+        <button type="submit" id="go">Search</button>
+        <p id="status" role="status"></p>
+      </form>
+
+      <section id="answer" hidden></section>
+      <ol id="results"></ol>
+      <footer>
+        <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>
+      </footer>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
