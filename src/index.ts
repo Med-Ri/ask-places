@@ -7,7 +7,7 @@ export {
   type UsageErrorCode,
 } from "./errors.js";
 export { DEFAULT_MODELS } from "./llm/models.js";
-export { MAX_RESULTS } from "./overture/places.js";
+export { MAX_RESULTS } from "./limits.js";
 export {
   SUPPORTED_PROVIDERS,
   type AskPlacesOptions,
@@ -16,5 +16,6 @@ export {
   type Place,
   type PlaceStatus,
   type Provider,
+  type StreetDistance,
   type TravelTime,
 } from "./types.js";

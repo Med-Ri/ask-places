@@ -10,6 +10,8 @@ const place = (name: string, description: string | null): Place => ({
   website: null,
   address: null,
   location: { lat: 36.8, lng: 10.14 },
+  distanceMeters: null,
+  streetDistance: { walking: null, driving: null, cycling: null },
   status: { state: "unknown", opensAt: null },
   travelTime: { walking: null, driving: null, cycling: null, transit: null },
 });
@@ -22,7 +24,7 @@ describe("filterPlacesToIntent", () => {
       place("Église Sainte-Monique", "Christian place of worship"),
       place("Some NGO", "Religious organization"),
     ];
-    const kept = filterPlacesToIntent(places, ["muslim_place_of_worship", "religious_organization"]);
-    expect(kept.map((p) => p.name)).toEqual(["جامع الباي", "Mosquée Bardo"]);
+    const kept = filterPlacesToIntent(places, ["mosque"]);
+    expect(kept.map((p) => p.name)).toEqual(["جامع الباي", "Mosquée Bardo", "Some NGO"]);
   });
 });

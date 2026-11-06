@@ -1,19 +1,10 @@
 /**
- * End-to-end check against real services. Needs a real LLM key in the environment.
+ * End-to-end check against the LLM and OpenStreetMap. Needs an LLM key only.
  *
- *   GROQ_API_KEY=gsk-… npm run try:ask -- --provider groq "cafés near Lac 2, Tunis"
- *   GROQ_API_KEY=gsk-… npm run try:ask -- --provider groq --origin 36.8455,10.2709 --radius 500 "restaurants near me"
+ *   GROQ_API_KEY=gsk_… npm run try:ask -- --provider groq --origin 36.801054,10.140123 "mosquée"
  */
-import { askPlaces, type AskPlacesDeps } from "../src/ask-places.js";
-import { distanceMeters } from "../src/geo.js";
-import { geocode } from "../src/geocode/geocode.js";
-import { addTransitEstimates } from "../src/llm/transit.js";
-import { createModel, DEFAULT_MODELS } from "../src/llm/models.js";
-import { understandQuestion } from "../src/llm/understand.js";
-import { runQuery } from "../src/overture/duckdb.js";
-import { searchPlaces } from "../src/overture/places.js";
-import { getLatestRelease } from "../src/overture/release.js";
-import { addTravelTimes } from "../src/routing/travel-times.js";
+import { askPlaces } from "../src/ask-places.js";
+import { DEFAULT_MODELS } from "../src/llm/models.js";
 import type { LatLng, Provider } from "../src/types.js";
 
 const args = process.argv.slice(2);
@@ -38,7 +29,7 @@ for (let i = 0; i < args.length; i++) {
 const question = questionParts.join(" ").trim();
 if (!question) {
   console.error(
-    'Usage: npm run try:ask -- [--provider groq] [--model …] [--origin 36.8455,10.2709] [--radius 500] "restaurants near me"',
+    'Usage: npm run try:ask -- [--provider groq] [--origin 36.80,10.14] [--radius 1500] "mosquée"',
   );
   process.exit(1);
 }
@@ -64,55 +55,28 @@ console.log(
     `${radiusMeters !== undefined ? ` radius=${radiusMeters}m` : ""}`,
 );
 
-async function timed<T>(label: string, task: () => Promise<T>): Promise<T> {
-  const start = performance.now();
-  process.stdout.write(`→ ${label}… `);
-  try {
-    const result = await task();
-    console.log(`${Math.round(performance.now() - start)} ms`);
-    return result;
-  } catch (error) {
-    console.log(`FAILED after ${Math.round(performance.now() - start)} ms`);
-    throw error;
-  }
-}
-
-const deps: AskPlacesDeps = {
-  createModel,
-  understand: (q, m, p) => timed("LLM understand question", () => understandQuestion(q, m, p)),
-  geocode: (query) => timed("geocode", () => geocode(query)),
-  getRelease: () => timed("Overture release", () => getLatestRelease()),
-  searchPlaces: (run, search) => timed("Overture place search", () => searchPlaces(run, search)),
-  runQuery,
-  addTravelTimes: (places, from) => timed("travel times (Valhalla)", () => addTravelTimes(places, from)),
-  addTransitEstimates: (places, m, p) => timed("LLM transit estimate", () => addTransitEstimates(places, m, p)),
-};
-
 const start = performance.now();
 try {
-  const places = await askPlaces(
-    question,
-    {
-      provider,
-      apiKey,
-      ...(model ? { model } : {}),
-      ...(origin ? { origin } : {}),
-      ...(radiusMeters !== undefined ? { radiusMeters } : {}),
-    },
-    deps,
-  );
+  const places = await askPlaces(question, {
+    provider,
+    apiKey,
+    ...(model ? { model } : {}),
+    ...(origin ? { origin } : {}),
+    ...(radiusMeters !== undefined ? { radiusMeters } : {}),
+  });
   console.log(`\n${places.length} places in ${Math.round(performance.now() - start)} ms\n`);
   for (const p of places) {
     const t = p.travelTime;
+    const s = p.streetDistance;
     const mins = (v: number | null) => (v === null ? "-" : `${v} min`);
-    const dist = origin ? `${Math.round(distanceMeters(origin, p.location))} m` : null;
+    const meters = (v: number | null) => (v === null ? "-" : `${v} m`);
     console.log(`- ${p.name} | ${p.description ?? "-"} | ${p.phoneNumber ?? "-"}`);
     console.log(`    ${p.address ?? "(no address)"}`);
     console.log(
-      `    ${p.location.lat.toFixed(6)}, ${p.location.lng.toFixed(6)}${dist ? ` | ${dist} straight-line` : ""}`,
+      `    ${p.location.lat.toFixed(6)}, ${p.location.lng.toFixed(6)} | ${p.distanceMeters ?? "-"} m straight-line`,
     );
     console.log(
-      `    walk ${mins(t.walking)}, car ${mins(t.driving)}, bike ${mins(t.cycling)}, transit ${t.transit ? `${t.transit.minutes} min (est.)` : "-"}`,
+      `    walk ${mins(t.walking)} (${meters(s.walking)}), car ${mins(t.driving)} (${meters(s.driving)}), bike ${mins(t.cycling)} (${meters(s.cycling)})`,
     );
   }
 } catch (error) {
@@ -122,13 +86,12 @@ try {
   process.exit(1);
 }
 
-/** Parses "lat,lng" (e.g. "36.8455,10.2709"). */
 function parseOrigin(value: string): LatLng {
   const [latRaw, lngRaw] = value.split(",");
   const lat = Number(latRaw);
   const lng = Number(lngRaw);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-    console.error(`Invalid --origin "${value}". Expected lat,lng e.g. 36.8455,10.2709`);
+    console.error(`Invalid --origin "${value}". Expected lat,lng e.g. 36.801054,10.140123`);
     process.exit(1);
   }
   return { lat, lng };

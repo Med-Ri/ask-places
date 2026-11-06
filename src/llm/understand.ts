@@ -1,8 +1,8 @@
 import { generateText, Output, type LanguageModel } from "ai";
 import { z } from "zod";
-import { MAX_RESULTS } from "../overture/places.js";
-import { COMMON_CATEGORIES } from "./categories.js";
+import { MAX_RESULTS } from "../limits.js";
 import { usageErrorFromLlm } from "./errors.js";
+import { GOOGLE_PLACE_TYPES } from "./place-types.js";
 import { llmAbortSignal } from "./timeout.js";
 
 /** Smallest / largest search radius we accept from the question (meters). */
@@ -16,8 +16,8 @@ export type UnderstoodQuestion = {
   where: string;
   /** ISO 3166-1 alpha-2 when known, e.g. "TN". Null when unknown. */
   countryCode: string | null;
-  /** Overture category ids. Empty = any category. */
-  categories: string[];
+  /** Google Places types (Table A), e.g. ["mosque"]. Empty when only a free-text query is known. */
+  includedTypes: string[];
   /** Max places to return when the user asked for a number, otherwise null. */
   limit: number | null;
   /** Search radius in meters when the user asked for one (e.g. "within 500m"), otherwise null. */
@@ -28,7 +28,7 @@ const schema = z.object({
   what: z.string(),
   where: z.string(),
   countryCode: z.string().nullable(),
-  categories: z.array(z.string()),
+  includedTypes: z.array(z.string()),
   limit: z.number().int().nullable(),
   radiusMeters: z.number().nullable(),
 });
@@ -38,18 +38,18 @@ Return JSON that matches the schema.
 
 Rules:
 - Understand intent and context, not only keywords. Examples:
-  - "أنا مسلم و أريد أن أصلي" / "I am Muslim and want to pray" / "مسجد" / "جامع" → muslim_place_of_worship ONLY (never church, never bare place_of_worship).
-  - Christian prayer / "église" / "church" → christian_place_of_worship, roman_catholic_place_of_worship (not mosque).
-  - "I need coffee" / "un café" / "قهوة" → cafe, coffee_shop.
-  - "banc" / "banque" / "bank" (Maghreb French: banc = bank, not a park bench) → bank_or_credit_union, bank.
-  - "magasin" / "magsain" / "store" / "shop" → shopping, supermarket, convenience_store as fits.
-  - "docteur" / "doctor" / "طبيب" → doctors_office, clinic.
-  - "bureau" / "office" → office, professional_service.
+  - "أنا مسلم و أريد أن أصلي" / "I am Muslim and want to pray" / "مسجد" / "جامع" → includedTypes ["mosque"] only (never church).
+  - Christian prayer / "église" / "church" → ["church"] (not mosque).
+  - "I need coffee" / "un café" / "قهوة" → ["cafe", "coffee_shop"].
+  - "banc" / "banque" / "bank" (Maghreb French: banc = bank, not a park bench) → ["bank", "atm"].
+  - "magasin" / "magsain" / "store" / "shop" → ["store", "supermarket", "convenience_store"] as fits.
+  - "docteur" / "doctor" / "طبيب" → ["doctor"].
+  - "farmasie" / "pharmacie" → ["pharmacy"].
 - Fix obvious typos and misspellings before mapping (farmasie/farmacie → pharmacy, resturant → restaurant, coffe → cafe, pharmacie → pharmacy, mosquee → mosque).
 - "what": short label for the kind of place in the user's language (corrected spelling ok), or "" if none.
 - "where": city, neighbourhood, landmark, or address to search. Use "" when the user only means "near me" / their GPS / a radius around themselves, or when no place name appears. Never put radius words, "near me", or the place type into "where".
 - "countryCode": ISO 3166-1 alpha-2 uppercase when you can infer it from "where" or clear context, otherwise null. Never invent a country.
-- "categories": 1 to 5 Overture Places category ids for "what". Prefer ids from this list when they fit: ${COMMON_CATEGORIES.join(", ")}. You may use other valid Overture snake_case ids if needed. Match specificity (restaurants ≠ cafes). Use [] only when there is truly no place type.
+- "includedTypes": 1 to 5 Google Places Table A type ids for "what". Prefer ids from this list when they fit: ${GOOGLE_PLACE_TYPES.join(", ")}. Match specificity (restaurant ≠ cafe ≠ bar). Use [] only when there is truly no place type.
 - "limit": positive integer when the user asks for a count of places, otherwise null. Cap at ${MAX_RESULTS}.
 - "radiusMeters": meters when the user asks for a radius / "within X" / "dans un rayon de X" / "في نطاق" (accept typos like "raduis"). Convert km → meters, miles → meters (1 mile → 1609). Otherwise null. Cap at ${MAX_RADIUS_METERS}.
 - Do not invent place names. Only interpret what to search for.`;
@@ -82,7 +82,7 @@ function normalize(raw: z.infer<typeof schema>): UnderstoodQuestion {
     what: raw.what.trim(),
     where: raw.where.trim(),
     countryCode: country && /^[A-Z]{2}$/.test(country) ? country : null,
-    categories: uniqueSnakeCase(raw.categories).slice(0, 5),
+    includedTypes: uniqueSnakeCase(raw.includedTypes).slice(0, 5),
     limit: raw.limit === null ? null : Math.min(Math.max(Math.trunc(raw.limit), 1), MAX_RESULTS),
     radiusMeters: normalizeRadius(raw.radiusMeters),
   };

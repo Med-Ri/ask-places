@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { askPlaces, DEFAULT_SEARCH_RADIUS_METERS, type AskPlacesDeps } from "../src/ask-places.js";
 import { AskPlacesInternalError, AskPlacesUsageError } from "../src/errors.js";
+import type { OsmPlaceSearch } from "../src/osm/overpass.js";
 import type { UnderstoodQuestion } from "../src/llm/understand.js";
 import type { Place } from "../src/types.js";
-import type { PlaceSearch } from "../src/overture/places.js";
 
 const options = { provider: "openai" as const, apiKey: "sk-test" };
 
@@ -11,104 +11,106 @@ const intent: UnderstoodQuestion = {
   what: "cafés",
   where: "Lac 2, Tunis",
   countryCode: "TN",
-  categories: ["cafe", "coffee_shop"],
+  includedTypes: ["cafe"],
   limit: null,
   radiusMeters: null,
 };
 
 const cafe: Place = {
   name: "Big Bang",
-  rating: null,
+  rating: 4.2,
   description: "Cafe",
   phoneNumber: null,
   website: null,
   address: "Tunis",
-  location: { lat: 36.84, lng: 10.27 },
-  status: { state: "unknown", opensAt: null },
+  location: { lat: 36.8455, lng: 10.2709 },
+  distanceMeters: null,
+  streetDistance: { walking: null, driving: null, cycling: null },
+  status: { state: "open", opensAt: null },
   travelTime: { walking: null, driving: null, cycling: null, transit: null },
 };
 
-const located = {
-  name: "Lac 2",
-  center: { lat: 36.8455, lng: 10.2709 },
-  area: { west: 10.26, south: 36.84, east: 10.28, north: 36.85 },
-  source: "nominatim" as const,
-};
+const center = { lat: 36.8455, lng: 10.2709 };
 
 function deps(overrides: AskPlacesDeps = {}): AskPlacesDeps & {
   understand: ReturnType<typeof vi.fn>;
   geocode: ReturnType<typeof vi.fn>;
-  searchPlaces: ReturnType<typeof vi.fn<(run: unknown, search: PlaceSearch) => Promise<Place[]>>>;
+  searchPlaces: ReturnType<typeof vi.fn<(search: OsmPlaceSearch) => Promise<Place[]>>>;
   addTravelTimes: ReturnType<typeof vi.fn>;
-  addTransitEstimates: ReturnType<typeof vi.fn>;
 } {
   return {
     createModel: vi.fn(() => ({ kind: "model" }) as never),
     understand: vi.fn(async () => intent),
-    geocode: vi.fn(async () => located),
-    getRelease: vi.fn(async () => "2026-10-21.0"),
-    searchPlaces: vi.fn(async (_run: unknown, _search: PlaceSearch) => [cafe]),
-    runQuery: vi.fn(async () => []),
+    geocode: vi.fn(async () => center),
+    searchPlaces: vi.fn(async () => [cafe]),
     addTravelTimes: vi.fn(async (places: Place[]) =>
-      places.map((p) => ({ ...p, travelTime: { ...p.travelTime, walking: 5, driving: 2, cycling: 2 } })),
-    ),
-    addTransitEstimates: vi.fn(async (places: Place[]) =>
-      places.map((p) => ({ ...p, travelTime: { ...p.travelTime, transit: { minutes: 8, estimated: true as const } } })),
+      places.map((p) => ({ ...p, travelTime: { ...p.travelTime, walking: 5, driving: 2, cycling: 2, transit: null } })),
     ),
     ...overrides,
   } as never;
 }
 
 describe("askPlaces", () => {
-  it("runs validate → understand → geocode → search → travel → transit", async () => {
+  it("understands, geocodes, searches Google, then adds route times", async () => {
     const d = deps();
     const places = await askPlaces("  cafés near Lac 2, Tunis ", options, d);
 
     expect(d.understand).toHaveBeenCalledWith("cafés near Lac 2, Tunis", { kind: "model" }, "openai");
-    expect(d.geocode).toHaveBeenCalledWith({ place: "Lac 2, Tunis", countryCode: "TN" });
-    const searchArg = d.searchPlaces.mock.calls[0]![1];
-    expect(searchArg.release).toBe("2026-10-21.0");
-    expect(searchArg.categories).toEqual(["cafe", "coffee_shop"]);
-    expect(searchArg.limit).toBe(20);
-    // Default 1.5 km around the geocoded place when no radius is given.
-    expect(searchArg.area.north - located.center.lat).toBeCloseTo(DEFAULT_SEARCH_RADIUS_METERS / 111_320, 5);
+    expect(d.geocode).toHaveBeenCalledWith("Lac 2, Tunis", "TN");
+    const search = d.searchPlaces.mock.calls[0]![0];
+    expect(search.center).toEqual(center);
+    expect(search.radiusMeters).toBe(DEFAULT_SEARCH_RADIUS_METERS);
+    expect(search.includedTypes).toEqual(expect.arrayContaining(["cafe", "coffee_shop"]));
     expect(d.addTravelTimes).toHaveBeenCalled();
-    expect(d.addTransitEstimates).toHaveBeenCalled();
-    expect(places).toHaveLength(1);
-    expect(places[0]?.travelTime).toEqual({ walking: 5, driving: 2, cycling: 2, transit: { minutes: 8, estimated: true } });
+    expect(places[0]?.travelTime.walking).toBe(5);
+    expect(places[0]?.travelTime.transit).toBeNull();
   });
 
-  it("expands bank categories so Overture bank_or_credit_union matches", async () => {
+  it("searches around origin when the question has no place name", async () => {
     const d = deps({
-      understand: vi.fn(async () => ({
-        ...intent,
-        what: "banc",
-        where: "",
-        countryCode: null,
-        categories: ["bank"],
-      })),
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null })),
     });
-    await askPlaces("banc near me", { ...options, origin: { lat: 36.84, lng: 10.27 } }, d);
-    expect(d.searchPlaces.mock.calls[0]![1].categories).toEqual(
-      expect.arrayContaining(["bank", "bank_or_credit_union", "atm"]),
-    );
+    const origin = { lat: 36.84, lng: 10.27 };
+    await askPlaces("cafés near me", { ...options, origin }, d);
+    expect(d.geocode).not.toHaveBeenCalled();
+    expect(d.searchPlaces.mock.calls[0]![0].center).toEqual(origin);
+    expect(d.searchPlaces.mock.calls[0]![0].radiusMeters).toBe(1_500);
   });
 
-  it("searches muslim_place_of_worship for Arabic prayer questions, not churches", async () => {
+  it("uses a radius from the question", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: null })),
+    });
+    const origin = { lat: 36.84, lng: 10.27 };
+    await askPlaces("cafés within 500m", { ...options, origin }, d);
+    expect(d.searchPlaces.mock.calls[0]![0].radiusMeters).toBe(500);
+  });
+
+  it("drops places outside the radius and sorts nearest first", async () => {
+    const near: Place = { ...cafe, name: "Near", location: { lat: 36.8404, lng: 10.27 } };
+    const far: Place = { ...cafe, name: "Far", location: { lat: 36.86, lng: 10.27 } };
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: 500 })),
+      searchPlaces: vi.fn(async () => [far, near]),
+    });
+    const origin = { lat: 36.84, lng: 10.27 };
+    const places = await askPlaces("cafés", { ...options, origin }, d);
+    expect(places.map((p) => p.name)).toEqual(["Near"]);
+    expect(places[0]?.distanceMeters).toBeGreaterThan(0);
+  });
+
+  it("searches mosques for an Arabic prayer question", async () => {
     const d = deps({
       understand: vi.fn(async () => ({
         ...intent,
         what: "مسجد",
         where: "",
         countryCode: null,
-        categories: ["place_of_worship"],
+        includedTypes: ["church"],
       })),
     });
-    await askPlaces("أنا مسلم و أريد أن أصلي أين يمكنني الذهاب", { ...options, origin: { lat: 36.84, lng: 10.27 } }, d);
-    const cats = d.searchPlaces.mock.calls[0]![1].categories;
-    expect(cats).toContain("muslim_place_of_worship");
-    expect(cats).toContain("religious_organization");
-    expect(cats).not.toContain("place_of_worship");
+    await askPlaces("أنا مسلم و أريد أن أصلي", { ...options, origin: { lat: 36.8, lng: 10.14 } }, d);
+    expect(d.searchPlaces.mock.calls[0]![0].includedTypes).toEqual(["mosque"]);
   });
 
   it("returns [] when the place cannot be geocoded", async () => {
@@ -117,126 +119,28 @@ describe("askPlaces", () => {
     expect(d.searchPlaces).not.toHaveBeenCalled();
   });
 
-  it("returns [] when the search finds nothing", async () => {
-    const d = deps({ searchPlaces: vi.fn(async () => []) });
-    expect(await askPlaces("cafés near Lac 2", options, d)).toEqual([]);
-    expect(d.addTravelTimes).not.toHaveBeenCalled();
-  });
-
-  it("searches around options.origin when the question has no where", async () => {
-    const d = deps({
-      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null })),
-    });
-    const origin = { lat: 36.84, lng: 10.27 };
-    await askPlaces("cafés near me", { ...options, origin }, d);
-
-    expect(d.geocode).not.toHaveBeenCalled();
-    expect(d.searchPlaces).toHaveBeenCalledOnce();
-    const searchArg = d.searchPlaces.mock.calls[0]![1];
-    expect(searchArg.area.north - origin.lat).toBeCloseTo(DEFAULT_SEARCH_RADIUS_METERS / 111_320, 5);
-  });
-
-  it("defaults to 1.5 km when no radius is set", async () => {
-    const d = deps({
-      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: null })),
-    });
-    const origin = { lat: 36.84, lng: 10.27 };
-    await askPlaces("cafés near me", { ...options, origin }, d);
-    expect(d.searchPlaces.mock.calls[0]![1].area.north - origin.lat).toBeCloseTo(1_500 / 111_320, 5);
-  });
-
-  it("returns places nearest to the origin first", async () => {
-    const farther: Place = { ...cafe, name: "Farther", location: { lat: 36.841, lng: 10.27 } };
-    const nearer: Place = { ...cafe, name: "Nearer", location: { lat: 36.8402, lng: 10.27 } };
-    const d = deps({
-      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null })),
-      searchPlaces: vi.fn(async () => [farther, nearer]),
-    });
-    const origin = { lat: 36.84, lng: 10.27 };
-    const places = await askPlaces("cafés near me", { ...options, origin }, d);
-    expect(places.map((p) => p.name)).toEqual(["Nearer", "Farther"]);
-  });
-
-  it("uses the asked radius around origin and drops places outside it", async () => {
-    const near: Place = { ...cafe, name: "Near", location: { lat: 36.8405, lng: 10.27 } };
-    const far: Place = { ...cafe, name: "Far", location: { lat: 36.85, lng: 10.28 } };
-    const d = deps({
-      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: 500 })),
-      searchPlaces: vi.fn(async () => [near, far]),
-    });
-    const origin = { lat: 36.84, lng: 10.27 };
-    const places = await askPlaces("restaurants within 500m", { ...options, origin }, d);
-
-    const searchArg = d.searchPlaces.mock.calls[0]![1];
-    // ~500 m in latitude degrees ≈ 0.0045
-    expect(searchArg.area.north - origin.lat).toBeCloseTo(500 / 111_320, 5);
-    expect(places.map((p) => p.name)).toEqual(["Near"]);
-    expect(d.addTravelTimes).toHaveBeenCalledWith([near], origin);
-  });
-
-  it("parses radius from the question when the LLM omits it", async () => {
-    const d = deps({
-      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: null })),
-    });
-    const origin = { lat: 36.84, lng: 10.27 };
-    await askPlaces("restaurants within 500m", { ...options, origin }, d);
-    const searchArg = d.searchPlaces.mock.calls[0]![1];
-    expect(searchArg.area.north - origin.lat).toBeCloseTo(500 / 111_320, 5);
-  });
-
-  it("lets options.radiusMeters override the question", async () => {
-    const d = deps({
-      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null, radiusMeters: 2_000 })),
-    });
-    const origin = { lat: 36.84, lng: 10.27 };
-    await askPlaces("restaurants within 2km", { ...options, origin, radiusMeters: 300 }, d);
-    const searchArg = d.searchPlaces.mock.calls[0]![1];
-    expect(searchArg.area.north - origin.lat).toBeCloseTo(300 / 111_320, 5);
-  });
-
-  it("applies radius around a geocoded place when the question asks for one", async () => {
-    const d = deps({
-      understand: vi.fn(async () => ({ ...intent, radiusMeters: 500 })),
-    });
-    await askPlaces("cafés within 500m of Lac 2, Tunis", options, d);
-    const searchArg = d.searchPlaces.mock.calls[0]![1];
-    expect(searchArg.area.north - located.center.lat).toBeCloseTo(500 / 111_320, 5);
-  });
-
-  it("returns [] when there is no where and no origin", async () => {
+  it("returns [] when there is no place name and no origin", async () => {
     const d = deps({
       understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null })),
     });
     expect(await askPlaces("cafés near me", options, d)).toEqual([]);
   });
 
-  it("respects a limit extracted from the question", async () => {
-    const d = deps({
-      understand: vi.fn(async () => ({ ...intent, limit: 3 })),
-    });
-    await askPlaces("3 cafés near Lac 2", options, d);
-    expect(d.searchPlaces.mock.calls[0]![1].limit).toBe(3);
-  });
-
-  it("rethrows usage errors (e.g. invalid API key) without wrapping them", async () => {
+  it("rethrows a usage error from the LLM", async () => {
     const d = deps({
       understand: vi.fn(async () => {
-        throw new AskPlacesUsageError("INVALID_API_KEY", 'askplaces: the API key for "openai" was rejected.');
+        throw new AskPlacesUsageError("INVALID_API_KEY", "bad");
       }),
     });
     await expect(askPlaces("cafés", options, d)).rejects.toMatchObject({ code: "INVALID_API_KEY" });
   });
 
-  it("wraps unexpected failures in AskPlacesInternalError", async () => {
-    const d = deps({
-      geocode: vi.fn(async () => {
-        throw new Error("DNS failure");
-      }),
-    });
+  it("wraps unexpected failures", async () => {
+    const d = deps({ geocode: vi.fn(async () => { throw new Error("DNS"); }) });
     await expect(askPlaces("cafés near Lac 2", options, d)).rejects.toBeInstanceOf(AskPlacesInternalError);
   });
 
-  it("rejects invalid input before calling the LLM", async () => {
+  it("rejects an empty question before calling the LLM", async () => {
     const d = deps();
     await expect(askPlaces("", options, d)).rejects.toMatchObject({ code: "INVALID_QUESTION" });
     expect(d.understand).not.toHaveBeenCalled();

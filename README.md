@@ -1,21 +1,31 @@
 # askplaces
 
-Ask a question about places in plain language and get structured JSON back, using your own LLM key.
+Ask a question about places in plain language and get structured JSON back.
 
-> **Status:** early development. Not published on npm yet. See [BRIEF.md](BRIEF.md) for the plan.
+The package uses **your LLM key** to understand the question and **OpenStreetMap** to find places.
+No Google key and no billing account. The radius is straight-line distance. Walk, car, and bike
+times and street distances come from Valhalla (OpenStreetMap roads). Rating and opening hours
+are always empty.
+
+> **Status:** early development. Not published on npm yet. See [BRIEF.md](BRIEF.md).
 
 ```ts
 import { askPlaces } from "askplaces";
 
-const places = await askPlaces("cafés near Lac 2, Tunis", {
-  provider: "openai",
-  apiKey: process.env.OPENAI_API_KEY,
+const places = await askPlaces("أنا مسلم و أريد أن أصلي", {
+  provider: "groq",
+  apiKey: process.env.GROQ_API_KEY,
+  origin: { lat: 36.801054, lng: 10.140123 }, // GPS, required for "near me"
+  // radiusMeters: 1500,                      // default 1.5 km, straight-line
 });
-// -> [{ name, rating, description, phoneNumber, website, address, location, status, travelTime }]
 ```
 
-- Backend only (Node.js 22+): your LLM key must never be shipped to a browser or mobile app.
-- Only your LLM API key is required. Place data comes from [Overture Maps](https://overturemaps.org).
+- Backend only (Node.js 22+). The LLM key must stay on the server.
+- At most 20 places, nearest by straight-line distance. `[]` when nothing is inside the radius.
+- `rating` is `null`. `status` is `"unknown"`. `description` is a short category label ("Mosque").
+- `distanceMeters` is straight-line. `streetDistance` and `travelTime` are the road route.
+- `travelTime.transit` is `null`.
+- Show OpenStreetMap attribution with the results.
 
 ## Development
 

@@ -1,91 +1,54 @@
 /**
- * Overture often uses broader ids than the short names people (and LLMs) pick.
- * e.g. mosques are "muslim_place_of_worship", not "mosque"; banks are "bank_or_credit_union".
+ * Maps short or legacy ids onto Google Places types, and catches Latin/Arabic hints
+ * when the LLM misses them.
  */
 const EXPAND: Record<string, readonly string[]> = {
-  bank: ["bank", "bank_or_credit_union"],
-  banque: ["bank", "bank_or_credit_union"],
-  atm: ["atm", "bank_or_credit_union"],
+  bank: ["bank", "atm"],
+  atm: ["atm", "bank"],
   cafe: ["cafe", "coffee_shop"],
-  café: ["cafe", "coffee_shop"],
   coffee_shop: ["cafe", "coffee_shop"],
   coffee: ["cafe", "coffee_shop"],
   restaurant: ["restaurant"],
-  bar: ["bar", "pub"],
-  pub: ["bar", "pub"],
+  bar: ["bar"],
   pharmacy: ["pharmacy"],
-  pharmacie: ["pharmacy"],
-  doctor: ["doctors_office", "clinic", "medical_center"],
-  doctors_office: ["doctors_office", "clinic", "medical_center"],
-  clinic: ["clinic", "doctors_office", "medical_center"],
-  // Overture uses muslim_place_of_worship; some mosques are only tagged religious_organization.
-  mosque: ["muslim_place_of_worship", "religious_organization"],
-  muslim_place_of_worship: ["muslim_place_of_worship", "religious_organization"],
-  church: ["christian_place_of_worship", "roman_catholic_place_of_worship"],
-  christian_place_of_worship: ["christian_place_of_worship", "roman_catholic_place_of_worship"],
-  store: ["shopping", "supermarket", "convenience_store", "department_store"],
-  shop: ["shopping", "supermarket", "convenience_store"],
-  shopping: ["shopping", "supermarket", "convenience_store", "department_store"],
-  supermarket: ["supermarket", "grocery_store", "convenience_store"],
-  office: ["office", "professional_service", "coworking_space"],
-  professional_service: ["professional_service", "office"],
+  doctor: ["doctor"],
+  doctors_office: ["doctor"],
+  clinic: ["doctor", "hospital"],
+  mosque: ["mosque"],
+  muslim_place_of_worship: ["mosque"],
+  church: ["church"],
+  store: ["store", "supermarket", "convenience_store"],
+  shopping: ["store", "supermarket", "convenience_store"],
+  supermarket: ["supermarket", "grocery_store"],
 };
 
-/**
- * Backups when the LLM misses a synonym, typo, or Arabic prayer intent.
- */
 const QUESTION_HINTS: { pattern: RegExp; categories: readonly string[] }[] = [
-  { pattern: /\b(bancs?|banques?|banks?)\b/i, categories: ["bank", "bank_or_credit_union", "atm"] },
-  { pattern: /\b(atms?|distributeurs?(?:\s+automatiques?)?)\b/i, categories: ["atm", "bank_or_credit_union"] },
-  { pattern: /\b(caf[eé]s?|coffe+e?\s*shops?|coff+e+)\b/i, categories: ["cafe", "coffee_shop"] },
-  { pattern: /\b(bars?|pubs?)\b/i, categories: ["bar", "pub"] },
-  { pattern: /\b((?:ph|f)arma(?:cie|sie|cy|cyie)s?|pharmacies?)\b/i, categories: ["pharmacy"] },
-  { pattern: /\b(mags?\w*|magasins?|stores?|shops?)\b/i, categories: ["shopping", "supermarket", "convenience_store"] },
-  { pattern: /\b(docteurs?|doctors?|m[eé]decins?)\b/i, categories: ["doctors_office", "clinic"] },
-  { pattern: /\b(bureaux?|offices?)\b/i, categories: ["office", "professional_service"] },
-  {
-    // Muslim prayer / mosque (Arabic + Latin). Do NOT map to generic place_of_worship.
-    pattern: /مسجد|جامع|مسل[م]|أصل[يى]|اصلي|صل[اا]ة|\b(mosqu\w*|masjid|muslim|pray(?:er|ing)?)\b/i,
-    categories: ["muslim_place_of_worship"],
-  },
+  { pattern: /\b(bancs?|banques?|banks?)\b/i, categories: ["bank", "atm"] },
+  { pattern: /\b(atms?)\b/i, categories: ["atm"] },
+  { pattern: /\b(caf[eé]s?|coff+e+)\b/i, categories: ["cafe", "coffee_shop"] },
+  { pattern: /\b(bars?|pubs?)\b/i, categories: ["bar"] },
+  { pattern: /\b((?:ph|f)arma(?:cie|sie|cy)s?)\b/i, categories: ["pharmacy"] },
+  { pattern: /\b(mags?\w*|magasins?|stores?|shops?)\b/i, categories: ["store", "supermarket"] },
+  { pattern: /\b(docteurs?|doctors?|m[eé]decins?)\b/i, categories: ["doctor"] },
+  { pattern: /مسجد|جامع|مسل[م]|أصل[يى]|اصلي|صل[اا]ة|\b(mosqu\w*|masjid|muslim|pray(?:er|ing)?)\b/i, categories: ["mosque"] },
   { pattern: /\b(restaurants?|rest+aurants?)\b/i, categories: ["restaurant"] },
 ];
 
-/**
- * Merges LLM categories with question hints and expands short ids to Overture parents.
- * Caps at 8 ids so the DuckDB filter stays selective.
- */
+/** Merges LLM types with question hints and expands them to Google place types. */
 export function expandCategories(llmCategories: string[], question: string): string[] {
   const fromHints = QUESTION_HINTS.filter((h) => h.pattern.test(question)).flatMap((h) => h.categories);
   const expanded = unique([...llmCategories, ...fromHints].flatMap((id) => EXPAND[id] ?? [id]));
-  return narrowWorship(expanded).slice(0, 8);
+  return narrowWorship(expanded, question).slice(0, 5);
 }
 
-/**
- * "place_of_worship" matches churches and mosques. When the intent is clearly Muslim
- * (or clearly Christian), keep only the matching religion-specific ids.
- */
-function narrowWorship(categories: string[]): string[] {
-  const muslim = categories.some((c) => c === "muslim_place_of_worship" || c === "mosque");
-  const christian = categories.some(
-    (c) => c === "christian_place_of_worship" || c === "roman_catholic_place_of_worship" || c === "church",
-  );
-
-  if (muslim && !christian) {
-    return unique([
-      ...categories.filter((c) => c !== "place_of_worship" && c !== "mosque" && c !== "church"),
-      "muslim_place_of_worship",
-      "religious_organization",
-    ]);
-  }
-  if (christian && !muslim) {
-    return unique([
-      ...categories.filter((c) => c !== "place_of_worship" && c !== "mosque" && c !== "church"),
-      "christian_place_of_worship",
-      "roman_catholic_place_of_worship",
-    ]);
-  }
-  return categories;
+function narrowWorship(categories: string[], question: string): string[] {
+  const muslim =
+    categories.includes("mosque") ||
+    /مسجد|جامع|مسل[م]|أصل[يى]|اصلي|\b(mosqu\w*|masjid|muslim)\b/i.test(question);
+  const christian = categories.includes("church") && !muslim;
+  if (muslim) return unique([...categories.filter((c) => c !== "church" && c !== "place_of_worship"), "mosque"]);
+  if (christian) return categories.filter((c) => c !== "mosque" && c !== "place_of_worship");
+  return categories.filter((c) => c !== "place_of_worship");
 }
 
 function unique(values: string[]): string[] {

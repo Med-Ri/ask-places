@@ -33,18 +33,25 @@ export type PlaceStatus = {
   opensAt: string | null;
 };
 
-/** An estimate made by the LLM, not a route calculation. */
+/** An estimate, not a route calculation. Transit is not filled in v1. */
 export type EstimatedDuration = {
   minutes: number;
   estimated: true;
 };
 
-/** Travel times in minutes. null when they could not be calculated. */
+/** Travel times in minutes along streets. null when they could not be calculated. Transit is always null. */
 export type TravelTime = {
   walking: number | null;
   driving: number | null;
   cycling: number | null;
   transit: EstimatedDuration | null;
+};
+
+/** Street distance in meters for the same modes as travelTime. */
+export type StreetDistance = {
+  walking: number | null;
+  driving: number | null;
+  cycling: number | null;
 };
 
 export type Place = {
@@ -55,6 +62,9 @@ export type Place = {
   website: string | null;
   address: string | null;
   location: LatLng;
+  /** Straight-line meters from the point travel is measured from. Used to apply the radius. */
+  distanceMeters: number | null;
+  streetDistance: StreetDistance;
   status: PlaceStatus;
   travelTime: TravelTime;
 };
