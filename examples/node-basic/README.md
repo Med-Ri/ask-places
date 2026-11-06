@@ -9,4 +9,4 @@ cd examples/node-basic
 npm start
 ```
 
-Open [http://127.0.0.1:3081](http://127.0.0.1:3081). The browser asks for your current location and the page sends it with the question to `POST http://127.0.0.1:3080/places`.
+Open [http://127.0.0.1:3081](http://127.0.0.1:3081). The page sends the question to `POST http://127.0.0.1:3080/places`. If you allow location, that point is sent too. If you do not, the search still runs.

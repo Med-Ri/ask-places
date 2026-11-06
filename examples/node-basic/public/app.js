@@ -19,7 +19,7 @@ form.addEventListener("submit", async (event) => {
     const response = await fetch("http://127.0.0.1:3080/places", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ question: question.value, origin }),
+      body: JSON.stringify({ question: question.value, ...(origin ? { origin } : {}) }),
     });
     const body = await response.json();
     if (!response.ok) {
@@ -47,12 +47,12 @@ form.addEventListener("submit", async (event) => {
 });
 
 function currentLocation() {
-  if (!navigator.geolocation) return Promise.reject(new Error("This browser cannot read your location."));
-  return new Promise((resolve, reject) => {
+  if (!navigator.geolocation) return Promise.resolve(null);
+  return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      () => reject(new Error("Allow location access so the search can run near you.")),
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8_000, maximumAge: 60_000 },
     );
   });
 }

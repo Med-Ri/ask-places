@@ -1,6 +1,6 @@
 # NestJS example
 
-An HTTP endpoint a web or mobile app can call. The LLM key stays on the server. The page sends the question and the user's current location.
+An HTTP endpoint a web or mobile app can call. The LLM key stays on the server. The page sends the question. The user's location is included only when they allow it.
 
 ```bash
 cd examples/nestjs-api
