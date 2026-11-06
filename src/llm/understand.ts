@@ -22,6 +22,8 @@ export type UnderstoodQuestion = {
   limit: number | null;
   /** Search radius in meters when the user asked for one (e.g. "within 500m"), otherwise null. */
   radiusMeters: number | null;
+  /** False when the question is not about finding a place. */
+  inContext: boolean;
 };
 
 const schema = z.object({
@@ -31,12 +33,15 @@ const schema = z.object({
   includedTypes: z.array(z.string()),
   limit: z.number().int().nullable(),
   radiusMeters: z.number().nullable(),
+  inContext: z.boolean(),
 });
 
 const SYSTEM = `You extract a place search from a user's question in ANY language (English, French, Arabic, Darija, Tunisian Arabic in Latin or Arabic script, Spanish, etc.).
 Return JSON that matches the schema.
 
 Rules:
+- "inContext": true only when the user wants to find a physical place. That includes a kind of place, a named venue, or an implied need ("I want to pray" → mosque, "I need coffee" → cafe, "where can I eat").
+- "inContext": false for anything else: greetings, jokes, math, weather, news, coding, homework, opinions, "who are you", or general knowledge. Do not answer that question. Set what="", where="", includedTypes=[], limit=null, radiusMeters=null, countryCode=null.
 - Understand intent and context, not only keywords. Examples:
   - "أنا مسلم و أريد أن أصلي" / "I am Muslim and want to pray" / "مسجد" / "جامع" → includedTypes ["mosque"] only (never church).
   - Christian prayer / "église" / "church" → ["church"] (not mosque).
@@ -85,6 +90,7 @@ function normalize(raw: z.infer<typeof schema>): UnderstoodQuestion {
     includedTypes: uniqueSnakeCase(raw.includedTypes).slice(0, 5),
     limit: raw.limit === null ? null : Math.min(Math.max(Math.trunc(raw.limit), 1), MAX_RESULTS),
     radiusMeters: normalizeRadius(raw.radiusMeters),
+    inContext: raw.inContext === true,
   };
 }
 

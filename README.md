@@ -12,15 +12,18 @@ are always empty.
 ```ts
 import { askPlaces } from "askplaces";
 
-const places = await askPlaces("أنا مسلم و أريد أن أصلي", {
+const result = await askPlaces("أنا مسلم و أريد أن أصلي", {
   provider: "groq",
   apiKey: process.env.GROQ_API_KEY,
   origin: { lat: 36.801054, lng: 10.140123 }, // GPS, required for "near me"
   // radiusMeters: 1500,                      // default 1.5 km, straight-line
 });
+// result.places — nearby places
+// result.answer — a generic reply when the question is not about places, otherwise null
 ```
 
 - Backend only (Node.js 22+). The LLM key must stay on the server.
+- A question that is not about finding a place (weather, jokes, math, greetings) returns `answer` and does not search.
 - Up to 20 places, nearest by straight-line distance. With no radius in the question, the search starts at 1.5 km and widens until there are 20 places, or it reaches 25 km. A radius you set ("within 500 m", or `radiusMeters`) stays fixed. `[]` when nothing is inside that radius.
 - `rating` is `null`. `status` is `"unknown"`. `description` is a short category label ("Mosque").
 - `distanceMeters` is straight-line. `streetDistance` and `travelTime` are the road route.

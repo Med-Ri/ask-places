@@ -54,6 +54,12 @@ export type StreetDistance = {
   cycling: number | null;
 };
 
+/** Places when the question is about finding a place. `answer` is set only when it is not. */
+export type AskPlacesResult = {
+  places: Place[];
+  answer: string | null;
+};
+
 export type Place = {
   name: string;
   rating: number | null;

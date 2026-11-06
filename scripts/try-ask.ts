@@ -57,27 +57,32 @@ console.log(
 
 const start = performance.now();
 try {
-  const places = await askPlaces(question, {
+  const result = await askPlaces(question, {
     provider,
     apiKey,
     ...(model ? { model } : {}),
     ...(origin ? { origin } : {}),
     ...(radiusMeters !== undefined ? { radiusMeters } : {}),
   });
-  console.log(`\n${places.length} places in ${Math.round(performance.now() - start)} ms\n`);
-  for (const p of places) {
-    const t = p.travelTime;
-    const s = p.streetDistance;
-    const mins = (v: number | null) => (v === null ? "-" : `${v} min`);
-    const meters = (v: number | null) => (v === null ? "-" : `${v} m`);
-    console.log(`- ${p.name} | ${p.description ?? "-"} | ${p.phoneNumber ?? "-"}`);
-    console.log(`    ${p.address ?? "(no address)"}`);
-    console.log(
-      `    ${p.location.lat.toFixed(6)}, ${p.location.lng.toFixed(6)} | ${p.distanceMeters ?? "-"} m straight-line`,
-    );
-    console.log(
-      `    walk ${mins(t.walking)} (${meters(s.walking)}), car ${mins(t.driving)} (${meters(s.driving)}), bike ${mins(t.cycling)} (${meters(s.cycling)})`,
-    );
+  if (result.answer) {
+    console.log(`\n${result.answer}\n`);
+  } else {
+    const places = result.places;
+    console.log(`\n${places.length} places in ${Math.round(performance.now() - start)} ms\n`);
+    for (const p of places) {
+      const t = p.travelTime;
+      const s = p.streetDistance;
+      const mins = (v: number | null) => (v === null ? "-" : `${v} min`);
+      const meters = (v: number | null) => (v === null ? "-" : `${v} m`);
+      console.log(`- ${p.name} | ${p.description ?? "-"} | ${p.phoneNumber ?? "-"}`);
+      console.log(`    ${p.address ?? "(no address)"}`);
+      console.log(
+        `    ${p.location.lat.toFixed(6)}, ${p.location.lng.toFixed(6)} | ${p.distanceMeters ?? "-"} m straight-line`,
+      );
+      console.log(
+        `    walk ${mins(t.walking)} (${meters(s.walking)}), car ${mins(t.driving)} (${meters(s.driving)}), bike ${mins(t.cycling)} (${meters(s.cycling)})`,
+      );
+    }
   }
 } catch (error) {
   const err = error as { name?: string; code?: string; message?: string; cause?: unknown };

@@ -1,3 +1,4 @@
+import { genericAnswerFor } from "./context.js";
 import { AskPlacesInternalError } from "./errors.js";
 import { distanceMeters } from "./geo.js";
 import { expandCategories } from "./llm/expand-categories.js";
@@ -9,7 +10,7 @@ import { geocodePlace } from "./osm/nominatim.js";
 import { searchOsmPlaces, type OsmPlaceSearch } from "./osm/overpass.js";
 import { addOsmTravelTimes } from "./osm/valhalla.js";
 import { parseRadiusFromQuestion } from "./parse-radius.js";
-import type { AskPlacesOptions, LatLng, Place } from "./types.js";
+import type { AskPlacesOptions, AskPlacesResult, LatLng, Place } from "./types.js";
 import { validateInput } from "./validate.js";
 
 /** Default search radius when neither the question nor options set one (1.5 km). */
@@ -26,9 +27,11 @@ export type AskPlacesDeps = {
 /**
  * Ask a question about places in plain language and get a JSON array of places back.
  * The LLM understands the question. OpenStreetMap supplies the places, the straight-line
- * radius, and the street distance and travel time. Returns [] when nothing is found.
+ * radius, and the street distance and travel time.
+ * A question that is not about places returns a generic `answer` and does not search.
+ * `places` is [] when nothing is found.
  */
-export async function askPlaces(question: string, options: AskPlacesOptions, deps: AskPlacesDeps = {}): Promise<Place[]> {
+export async function askPlaces(question: string, options: AskPlacesOptions, deps: AskPlacesDeps = {}): Promise<AskPlacesResult> {
   const { question: q, options: opts } = validateInput(question, options);
 
   try {
@@ -39,7 +42,7 @@ export async function askPlaces(question: string, options: AskPlacesOptions, dep
   }
 }
 
-async function run(question: string, options: AskPlacesOptions, deps: AskPlacesDeps): Promise<Place[]> {
+async function run(question: string, options: AskPlacesOptions, deps: AskPlacesDeps): Promise<AskPlacesResult> {
   const understand = deps.understand ?? understandQuestion;
   const makeModel = deps.createModel ?? createModel;
   const doGeocode = deps.geocode ?? geocodePlace;
@@ -48,13 +51,17 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
 
   const model = makeModel(options.provider, options.apiKey, options.model);
   const intent = await understand(question, model, options.provider);
+  if (!intent.inContext) return { places: [], answer: genericAnswerFor(question) };
   const includedTypes = expandCategories(intent.includedTypes, question);
+  if (includedTypes.length === 0 && intent.what.trim() === "" && intent.where.trim() === "") {
+    return { places: [], answer: genericAnswerFor(question) };
+  }
   const limit = intent.limit ?? MAX_RESULTS;
   const explicitRadius = hasExplicitRadius(question, options, intent);
   let radiusMeters = resolveRadiusMeters(question, options, intent);
 
   const center = await resolveCenter(intent, options.origin, doGeocode);
-  if (!center) return [];
+  if (!center) return { places: [], answer: null };
   const searchCenter = center;
 
   const origin = options.origin ?? searchCenter;
@@ -68,9 +75,9 @@ async function run(question: string, options: AskPlacesOptions, deps: AskPlacesD
       nearby = await searchNearby(radiusMeters);
     }
   }
-  if (nearby.length === 0) return [];
+  if (nearby.length === 0) return { places: [], answer: null };
 
-  return doTravel(nearby, origin);
+  return { places: await doTravel(nearby, origin), answer: null };
 
   async function searchNearby(radius: number): Promise<Place[]> {
     const found = await doSearch({

@@ -11,6 +11,7 @@ export { MAX_RESULTS } from "./limits.js";
 export {
   SUPPORTED_PROVIDERS,
   type AskPlacesOptions,
+  type AskPlacesResult,
   type EstimatedDuration,
   type LatLng,
   type Place,

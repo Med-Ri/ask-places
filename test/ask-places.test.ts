@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { genericAnswerFor } from "../src/context.js";
 import { askPlaces, DEFAULT_SEARCH_RADIUS_METERS, type AskPlacesDeps } from "../src/ask-places.js";
 import { AskPlacesInternalError, AskPlacesUsageError } from "../src/errors.js";
 import type { OsmPlaceSearch } from "../src/osm/overpass.js";
@@ -14,6 +15,7 @@ const intent: UnderstoodQuestion = {
   includedTypes: ["cafe"],
   limit: null,
   radiusMeters: null,
+  inContext: true,
 };
 
 const cafe: Place = {
@@ -53,7 +55,7 @@ function deps(overrides: AskPlacesDeps = {}): AskPlacesDeps & {
 describe("askPlaces", () => {
   it("understands, geocodes, searches OpenStreetMap, then adds route times", async () => {
     const d = deps();
-    const places = await askPlaces("  cafés near Lac 2, Tunis ", options, d);
+    const { places } = await askPlaces("  cafés near Lac 2, Tunis ", options, d);
 
     expect(d.understand).toHaveBeenCalledWith("cafés near Lac 2, Tunis", { kind: "model" }, "openai");
     expect(d.geocode).toHaveBeenCalledWith("Lac 2, Tunis", "TN");
@@ -101,7 +103,7 @@ describe("askPlaces", () => {
       understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null })),
       searchPlaces,
     });
-    const places = await askPlaces("cafés", { ...options, origin }, d);
+    const { places } = await askPlaces("cafés", { ...options, origin }, d);
     expect(searchPlaces.mock.calls.map((call) => call[0].radiusMeters)).toEqual([1_500, 3_000]);
     expect(places).toHaveLength(20);
     expect(places[0]?.name).toBe("Place 1");
@@ -115,7 +117,7 @@ describe("askPlaces", () => {
       searchPlaces: vi.fn(async () => [far, near]),
     });
     const origin = { lat: 36.84, lng: 10.27 };
-    const places = await askPlaces("cafés", { ...options, origin }, d);
+    const { places } = await askPlaces("cafés", { ...options, origin }, d);
     expect(places.map((p) => p.name)).toEqual(["Near"]);
     expect(places[0]?.distanceMeters).toBeGreaterThan(0);
   });
@@ -136,7 +138,7 @@ describe("askPlaces", () => {
 
   it("returns [] when the place cannot be geocoded", async () => {
     const d = deps({ geocode: vi.fn(async () => null) });
-    expect(await askPlaces("cafés in Nowhereville", options, d)).toEqual([]);
+    expect(await askPlaces("cafés in Nowhereville", options, d)).toEqual({ places: [], answer: null });
     expect(d.searchPlaces).not.toHaveBeenCalled();
   });
 
@@ -144,7 +146,42 @@ describe("askPlaces", () => {
     const d = deps({
       understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null })),
     });
-    expect(await askPlaces("cafés near me", options, d)).toEqual([]);
+    expect(await askPlaces("cafés near me", options, d)).toEqual({ places: [], answer: null });
+  });
+
+  it("returns a generic answer and does not search when the question is off topic", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({
+        ...intent,
+        what: "",
+        where: "",
+        countryCode: null,
+        includedTypes: [],
+        inContext: false,
+      })),
+    });
+    const result = await askPlaces("what is the weather today", { ...options, origin: { lat: 36.8, lng: 10.14 } }, d);
+    expect(result).toEqual({ places: [], answer: genericAnswerFor("what is the weather today") });
+    expect(d.geocode).not.toHaveBeenCalled();
+    expect(d.searchPlaces).not.toHaveBeenCalled();
+    expect(d.addTravelTimes).not.toHaveBeenCalled();
+  });
+
+  it("answers in French when a French question is off topic", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, what: "", where: "", includedTypes: [], inContext: false })),
+    });
+    const result = await askPlaces("bonjour, raconte-moi une blague", options, d);
+    expect(result.answer).toMatch(/lieu/);
+  });
+
+  it("answers in Arabic when an Arabic question is off topic", async () => {
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, what: "", where: "", includedTypes: [], inContext: false })),
+    });
+    const result = await askPlaces("ما هو الطقس اليوم", options, d);
+    expect(result.answer).toMatch(/مكان/);
+    expect(result.places).toEqual([]);
   });
 
   it("rethrows a usage error from the LLM", async () => {
