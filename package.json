@@ -1,8 +1,16 @@
 {
   "name": "askplaces",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Ask a question about places in plain language and get structured JSON back, using your LLM key and OpenStreetMap.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Med-Ri/ask-places.git"
+  },
+  "homepage": "https://github.com/Med-Ri/ask-places",
+  "bugs": {
+    "url": "https://github.com/Med-Ri/ask-places/issues"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

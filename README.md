@@ -1,10 +1,14 @@
 # askplaces
 
-Ask for places in plain language and get structured JSON back.
+Ask for a place in plain language and get structured JSON back.
 
-`askplaces` runs on your backend. Your LLM key is used only to understand the question. Place data, geocoding, and travel times come from [OpenStreetMap](https://www.openstreetmap.org/copyright). There is no map-vendor key and no billing account for map data.
+[![npm version](https://img.shields.io/npm/v/askplaces.svg)](https://www.npmjs.com/package/askplaces)
+[![source](https://img.shields.io/badge/source-GitHub-181717)](https://github.com/Med-Ri/ask-places)
+[![license](https://img.shields.io/npm/l/askplaces.svg)](https://github.com/Med-Ri/ask-places/blob/main/LICENSE)
 
-> Early development. Not published on npm yet. See [BRIEF.md](BRIEF.md).
+`askplaces` is a Node.js library for your backend. Your LLM key is used to understand the question. Place data, geocoding, and travel times come from [OpenStreetMap](https://www.openstreetmap.org/copyright). You do not need a map-vendor key.
+
+Repository: [github.com/Med-Ri/ask-places](https://github.com/Med-Ri/ask-places)
 
 ## Install
 
@@ -12,12 +16,6 @@ Requires Node.js 22 or newer.
 
 ```bash
 npm install askplaces
-```
-
-Until the package is published, install this folder from your app:
-
-```bash
-npm install ./askplaces
 ```
 
 Keep the LLM key on the server. A browser or mobile app should call your backend. See [examples/nestjs-api](examples/nestjs-api).
@@ -43,7 +41,7 @@ if (result.answer) {
 }
 ```
 
-`origin` is the point travel is measured from. Pass the user's GPS position for a "near me" question. If the question names a place instead, that place is geocoded and used as the center when `origin` is omitted.
+`origin` is the point travel is measured from. Pass the user's GPS position for a "near me" question. When the question names a place and `origin` is omitted, that place is geocoded and used as the center.
 
 `radiusMeters` overrides a radius written in the question. When neither is set, the search starts at 1.5 km and widens until there are 20 places or the radius reaches 25 km. An explicit radius stays fixed.
 
@@ -55,18 +53,18 @@ A question that is not about finding a place, such as weather, math, or a greeti
 
 One key is required: the key for the provider that reads the question. Names are lowercase.
 
-`provider: "google"` means Gemini. It is not a Google Maps key.
+`provider: "google"` means Gemini. It is a language-model key, separate from any map product.
 
 | `provider` | Where to get the key | Default model |
 |---|---|---|
-| `openai` | platform.openai.com | `gpt-4.1-mini` |
-| `anthropic` | console.anthropic.com | `claude-haiku-4-5` |
-| `google` | aistudio.google.com | `gemini-3.8-flash` |
-| `xai` | console.x.ai | `grok-4.20-non-reasoning` |
-| `deepseek` | platform.deepseek.com | `deepseek-flash` |
-| `groq` | console.groq.com (`gsk_…`) | `openai/gpt-oss-20b` |
+| `openai` | [platform.openai.com](https://platform.openai.com) | `gpt-4.1-mini` |
+| `anthropic` | [console.anthropic.com](https://console.anthropic.com) | `claude-haiku-4-5` |
+| `google` | [aistudio.google.com](https://aistudio.google.com) | `gemini-3.8-flash` |
+| `xai` | [console.x.ai](https://console.x.ai) | `grok-4.20-non-reasoning` |
+| `deepseek` | [platform.deepseek.com](https://platform.deepseek.com) | `deepseek-flash` |
+| `groq` | [console.groq.com](https://console.groq.com) (`gsk_…`) | `openai/gpt-oss-20b` |
 
-Pass `model` to use a different model id for that provider. Groq is not the same service as xAI.
+Pass `model` to use a different model id for that provider. Groq and xAI are different services.
 
 ## Language
 
@@ -87,7 +85,7 @@ type AskPlacesResult = {
 |---|---|
 | `name` | Name from OpenStreetMap |
 | `description` | Short category label, such as "Cafe" |
-| `phoneNumber`, `website`, `address` | Set only when OpenStreetMap has them, otherwise `null` |
+| `phoneNumber`, `website`, `address` | Present when OpenStreetMap has them, otherwise `null` |
 | `location` | `{ lat, lng }` |
 | `distanceMeters` | Straight-line meters from the travel origin |
 | `streetDistance` | Road meters for `walking`, `driving`, and `cycling`. A mode is `null` when the route could not be calculated |
@@ -151,4 +149,4 @@ npm run try:ask -- --provider openai --origin <lat>,<lng> "pharmacy"
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/Med-Ri/ask-places/blob/main/LICENSE)
