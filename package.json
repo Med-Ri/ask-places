@@ -1,6 +1,6 @@
 {
   "name": "askplaces",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Ask a question about places in plain language and get structured JSON back, using your LLM key and OpenStreetMap.",
   "license": "MIT",
   "type": "module",
