@@ -8,6 +8,9 @@ coverage/
 .env.*
 !.env.example
 
+# Local project brief. Kept on disk, not in the repository.
+BRIEF.md
+
 # Logs and OS noise
 *.log
 .DS_Store
