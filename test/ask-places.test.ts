@@ -51,7 +51,7 @@ function deps(overrides: AskPlacesDeps = {}): AskPlacesDeps & {
 }
 
 describe("askPlaces", () => {
-  it("understands, geocodes, searches Google, then adds route times", async () => {
+  it("understands, geocodes, searches OpenStreetMap, then adds route times", async () => {
     const d = deps();
     const places = await askPlaces("  cafés near Lac 2, Tunis ", options, d);
 
@@ -84,6 +84,27 @@ describe("askPlaces", () => {
     const origin = { lat: 36.84, lng: 10.27 };
     await askPlaces("cafés within 500m", { ...options, origin }, d);
     expect(d.searchPlaces.mock.calls[0]![0].radiusMeters).toBe(500);
+    expect(d.searchPlaces).toHaveBeenCalledTimes(1);
+  });
+
+  it("widens the default radius until it can return 20 places", async () => {
+    const origin = { lat: 36.84, lng: 10.27 };
+    const searchPlaces = vi.fn(async (search: OsmPlaceSearch) => {
+      const count = search.radiusMeters >= 3_000 ? 20 : 3;
+      return Array.from({ length: count }, (_, index) => ({
+        ...cafe,
+        name: `Place ${index + 1}`,
+        location: { lat: origin.lat + index * 0.0001, lng: origin.lng },
+      }));
+    });
+    const d = deps({
+      understand: vi.fn(async () => ({ ...intent, where: "", countryCode: null })),
+      searchPlaces,
+    });
+    const places = await askPlaces("cafés", { ...options, origin }, d);
+    expect(searchPlaces.mock.calls.map((call) => call[0].radiusMeters)).toEqual([1_500, 3_000]);
+    expect(places).toHaveLength(20);
+    expect(places[0]?.name).toBe("Place 1");
   });
 
   it("drops places outside the radius and sorts nearest first", async () => {

@@ -64,6 +64,32 @@ describe("overpass", () => {
     });
   });
 
+  it("tries the next Overpass server when the first times out", async () => {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      if (String(input).includes("openstreetmap.fr")) {
+        const error = new Error("The operation was aborted due to timeout");
+        error.name = "TimeoutError";
+        throw error;
+      }
+      return jsonResponse({
+        elements: [
+          {
+            type: "node",
+            lat: 36.8012,
+            lon: 10.1402,
+            tags: { name: "جامع", amenity: "place_of_worship", religion: "muslim" },
+          },
+        ],
+      });
+    });
+    const places = await searchOsmPlaces(
+      { center: { lat: 36.801, lng: 10.14 }, radiusMeters: 1500, includedTypes: ["mosque"], textQuery: "", limit: 20 },
+      { fetch },
+    );
+    expect(places.map((place) => place.name)).toEqual(["جامع"]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("skips a place with no name", () => {
     expect(toPlace({ lat: 1, lon: 2, tags: { amenity: "cafe" } })).toBeNull();
   });

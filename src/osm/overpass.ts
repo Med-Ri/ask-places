@@ -3,7 +3,11 @@ import { MAX_RESULTS } from "../limits.js";
 import type { LatLng, Place } from "../types.js";
 import { USER_AGENT } from "../user-agent.js";
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+/** Fast public mirror first. The main server often sits in a queue for ~30s, which used to hit the client timeout. */
+const OVERPASS_SERVERS = [
+  { url: "https://overpass.openstreetmap.fr/api/interpreter", timeoutMs: 20_000 },
+  { url: "https://overpass-api.de/api/interpreter", timeoutMs: 60_000 },
+] as const;
 
 type OsmFilter = { key: string; value?: string; religion?: string };
 
@@ -71,14 +75,7 @@ export async function searchOsmPlaces(search: OsmPlaceSearch, deps: OverpassDeps
   const query = buildQuery(search, radius);
   if (!query) return [];
 
-  const response = await fetchFn(OVERPASS_URL, {
-    method: "POST",
-    headers: { "User-Agent": USER_AGENT, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: `data=${encodeURIComponent(query)}`,
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new Error(`Overpass returned HTTP ${response.status}`);
-  const json = (await response.json()) as { elements?: OsmElement[] };
+  const json = await fetchOverpass(query, fetchFn);
   const elements = Array.isArray(json.elements) ? json.elements : [];
 
   const places = elements.flatMap((element) => {
@@ -108,6 +105,37 @@ export function buildQuery(search: OsmPlaceSearch, radius: number): string | nul
   }
   if (clauses.length === 0) return null;
   return `[out:json][timeout:25];(\n${clauses.join("\n")}\n);out center tags;`;
+}
+
+type OverpassJson = { elements?: OsmElement[]; remark?: string };
+
+/** Tries each public Overpass server. A timeout or 5xx moves on; a bad query does not. */
+async function fetchOverpass(query: string, fetchFn: typeof fetch): Promise<OverpassJson> {
+  let lastError: unknown;
+  for (const server of OVERPASS_SERVERS) {
+    try {
+      const response = await fetchFn(server.url, {
+        method: "POST",
+        headers: { "User-Agent": USER_AGENT, "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(server.timeoutMs),
+      });
+      if (response.status === 400) throw new Error(`Overpass returned HTTP 400`);
+      if (!response.ok) throw new Error(`Overpass returned HTTP ${response.status}`);
+      const json = (await response.json()) as OverpassJson;
+      const remark = typeof json.remark === "string" ? json.remark : "";
+      if (/timed out|runtime error/i.test(remark)) throw new Error(remark);
+      return json;
+    } catch (error) {
+      if (error instanceof Error && error.message === "Overpass returned HTTP 400") throw error;
+      lastError = isTimeout(error) ? new Error(`Overpass timed out after ${server.timeoutMs / 1000}s`) : error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Overpass request failed");
+}
+
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 }
 
 function clause(filter: OsmFilter, around: string): string {

@@ -21,7 +21,7 @@ const places = await askPlaces("أنا مسلم و أريد أن أصلي", {
 ```
 
 - Backend only (Node.js 22+). The LLM key must stay on the server.
-- At most 20 places, nearest by straight-line distance. `[]` when nothing is inside the radius.
+- Up to 20 places, nearest by straight-line distance. With no radius in the question, the search starts at 1.5 km and widens until there are 20 places, or it reaches 25 km. A radius you set ("within 500 m", or `radiusMeters`) stays fixed. `[]` when nothing is inside that radius.
 - `rating` is `null`. `status` is `"unknown"`. `description` is a short category label ("Mosque").
 - `distanceMeters` is straight-line. `streetDistance` and `travelTime` are the road route.
 - `travelTime.transit` is `null`.
