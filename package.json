@@ -43,6 +43,7 @@
     "openai"
   ],
   "devDependencies": {
+    "@changesets/cli": "^3.0.3",
     "@types/node": "^24.19.2",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",
